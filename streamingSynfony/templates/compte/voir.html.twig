@@ -1,0 +1,101 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Votre compte{% endblock %}
+
+{% block body %}
+    <input type="button" value="<=" onclick="location.href = '/admin/userList'"/>
+    <br/>
+    <h1>Votre compte</h1>
+    <br/>
+    <table>
+        <tr>
+            <td>Adresse mail : </td><td>{{ me.email }}</td>
+        </tr>
+        <tr>
+            <td>Date de naissance : </td><td>{{ me.dateN|date("Y/m/d") }}</td>
+        </tr>
+        <tr>
+            <td>Permissions : </td><td>{{ me.perm }}</td>
+        </tr>
+        {% if me.perm == "admin" or me.perm == "uploader" %}
+            {% if me.perm == "uploader" %}
+                {% set adj = "uploadé(s)" %}
+            {% else %}
+                {% set adj = "cedé(s)" %}
+            {% endif %}
+            <tr>
+                <td>Films {{ adj }} : </td><td>{{ me.films|length }}</td><td><a target="_blank" href="/view/allFilms">Voir</a></td>
+            </tr>
+            <tr>
+                <td>Sagas {{ adj }} : </td><td>{{ me.sagas|length }}</td><td><a target="_blank" href="/view/allSagas">Voir</a></td>
+            </tr>
+            <tr>
+                <td>Episodes {{ adj }} : </td><td>{{ me.episodes|length }}</td><td><a target="_blank" href="/view/allEpisodes">Voir</a></td>
+            </tr>
+            <tr>
+                <td>Saisons {{ adj }} : </td><td>{{ me.saisons|length }}</td><td><a target="_blank" href="/view/allSaisons">Voir</a></td>
+            </tr>
+            <tr>
+                <td>Series {{ adj }} : </td><td>{{ me.series|length }}</td><td><a target="_blank" href="/view/allSeries">Voir</a></td>
+            </tr>
+        {% endif %}
+    </table>
+    <br/>
+    <h2>Changer votre mot de passe</h2>
+    <table>
+        <tr>
+            <td>Entrez le : </td><td><input type="password" id="password1"/></td>
+        </tr>
+        <tr>
+            <td>Re-rentrez le : </td><td><input type="password" id="password2"/></td>
+        </tr>
+        <tr>
+            <td colspan="2" id="msgPasswd"></td>
+        </tr>
+        <tr>
+            <td colspan="2"><center><input type="button" value="Changer" onclick="changePasswd()"/></center></td>
+        </tr>
+    </table>
+{% endblock %}
+{% block javascripts %}
+    <script>
+        function changePasswd() {
+            const password1 = $("#password1").val();
+            const password2 = $("#password2").val();
+            if (password1 != password2) {
+                $("#password2").val("");
+                $("#password1").val("");
+                $("#msgPasswd").html("<font color='red' size='3'>Vous n'avez pas rentrez 2 fois le même mot de passe</font>");
+                return;
+            } else if (password1 == "") {
+                $("#msgPasswd").html("<font color='red' size='3'>Vous n'avez rentrez aucun mot de passe</font>");
+                return;
+            }
+            let formData = new FormData();
+            formData.append('password', password1);
+
+            $.ajax({
+                url:'http://'+window.location.hostname+':8000/compte/changePasswd',
+                data:formData,
+                type:'POST',
+                processData: false,
+                dataType: 'json',
+                contentType: false,
+                success: (data) =>
+                {
+                    if (data.rep == "success") {
+                        $("#password2").val("");
+                        $("#password1").val("");
+                        $("#msgPasswd").html("<font color='green' size='3'>Mot de passe modifié!</font>");
+                    } else if (data.rep == "failed") {
+                        $("#msgPasswd").html("<font color='red' size='3'>Modification échouée!</font>");
+                    }
+                },
+                error:function(xhr,rrr,error)
+                {
+                    alert(error);
+                }
+            });
+        }
+    </script>
+{% endblock %}

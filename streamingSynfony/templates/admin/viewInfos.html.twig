@@ -1,0 +1,39 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ user.prenom }} {{ user.nom }} - Infos{% endblock %}
+
+{% block body %}
+    <input type="button" value="<=" onclick="location.href = '/admin/userList'"/>
+    <br/>
+    <h1>Infos de '{{ user.prenom }} {{ user.nom }}' : </h1>
+    <br/>
+    <table>
+        <tr>
+            <td>Adresse mail : </td><td>{{ user.email }}</td>
+        </tr>
+        <tr>
+            <td>Date de naissance : </td><td>{{ user.dateN|date("Y/m/d") }}</td>
+        </tr>
+        <tr>
+            <td>Permissions : </td><td>{{ user.perm }}</td>
+        </tr>
+        <tr>
+            <td>Bannis : </td><td>{{ ((user.banned == 1) ? "Oui" : "Non") }}</td>
+        </tr>
+        <tr>
+            <td>Films uploadés : </td><td>{{ user.films|length }}</td><td><a target="_blank" href="/view/allFilms?idUser={{ user.id }}">Voir</a></td>
+        </tr>
+        <tr>
+            <td>Sagas uploadés : </td><td>{{ user.sagas|length }}</td><td><a target="_blank" href="/view/allSagas?idUser={{ user.id }}">Voir</a></td>
+        </tr>
+        <tr>
+            <td>Episodes uploadés : </td><td>{{ user.episodes|length }}</td><td><a target="_blank" href="/view/allEpisodes?idUser={{ user.id }}">Voir</a></td>
+        </tr>
+        <tr>
+            <td>Saisons uploadés : </td><td>{{ user.saisons|length }}</td><td><a target="_blank" href="/view/allSaisons?idUser={{ user.id }}">Voir</a></td>
+        </tr>
+        <tr>
+            <td>Series uploadés : </td><td>{{ user.series|length }}</td><td><a target="_blank" href="/view/allSeries?idUser={{ user.id }}">Voir</a></td>
+        </tr>
+    </table>
+{% endblock %}

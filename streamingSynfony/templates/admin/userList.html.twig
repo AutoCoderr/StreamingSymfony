@@ -1,0 +1,183 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Liste des utilisateurs{% endblock %}
+
+{% block body %}
+    Filtres :
+    <br/>
+    <table style="border-spacing: 5px; border-collapse: separate;">
+        <tr>
+            <td>
+                Par prénom/nom :<input type="text" id="filtreNom" />
+            </td>
+            <td>
+                Par email :<input type="text" id="filtreEmail" />
+            </td>
+            <td>
+                Trier : <select id="filtreTrie">
+                    <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                    <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align: center;" colspan="3">
+                <input type="button" value="Appliquer" onclick="filtre()"/>
+            </td>
+        </tr>
+    </table>
+    <h1>Liste des utilisateurs :</h1>
+    <br/>
+    <div id="listUser"></div>
+    <div id="unModal" class="modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Céder ces métrages</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="id"/>
+                    <input type="hidden" id="val"/>
+                    Voulez vous céder ses métrages à quelqu'un ? <input id="ChoiceCede" onchange="ChoiceCede()" type="checkbox">
+                    <div id="formCede"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="banUnBanSendDatas()">Valider</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block javascripts %}
+    {% include 'filtres/javascript.twig' %}
+    <script>
+        let liste = [];
+        {% for user in users %}
+            {% if (user.id != me.id) and ((user.perm != "admin" and user.perm != "moderateur") or (me.perm == "admin" and user.perm == "moderateur")) %}
+                liste.push({id: {{ user.id }}, titre: "{{ user.prenom }} {{ user.nom }}",
+                    email: "{{ user.email }}",
+                    perm: "{{ user.perm }}",
+                    banned: (({{ user.banned}} == 1) ? true : false)});
+            {% endif %}
+        {% endfor %}
+        if (liste.length == 0) {
+            $("#listUser").html("<font size='3' color='orange'>Il n'y a aucun film</font>");
+        } else {
+            liste = trieAlphabetique("croissant", liste);
+            display(liste);
+        }
+
+        function display(userListe) {
+            let str = "<table>";
+            for (let i=0;i<userListe.length;i++) {
+                str += "<tr><td>"+userListe[i].titre+" ("+userListe[i].email+")</td>";
+                if (userListe[i].banned) {
+                    str += "<td><input id='btBan_"+userListe[i].id+"' type='button' value='De-bannir' onclick='banUnBan(0,"+userListe[i].id+")'/></td>";
+                } else {
+                    str += "<td><input id='btBan_"+userListe[i].id+"' type='button' value='Bannir' onclick='banUnBan(1,"+userListe[i].id+")'/></td>";
+                }
+                {% if me.perm == "admin" %}
+                    str += "<td><input type='button' value='Voir infos' onclick='location.href = `/admin/viewInfos?id="+userListe[i].id+"`'/></td>";
+                {% endif %}
+                str += "</tr>";
+            }
+            str += "</table>";
+            $("#listUser").html(str);
+        }
+
+        function banUnBan(val, id) {
+            if (val == 0) {
+                banUnBanSendDatas(id,val);
+            } else {
+                $("#formCede").html("");
+                $("#ChoiceCede").prop("checked",false);
+                $("#id").val(id);
+                $("#val").val(val);
+                for (let i=0;i<liste.length;i++) {
+                    if (liste[i].id == id) {
+                        $(".modal-title").html(((val == 1) ? "Bannir" : "De-bannir")+" "+liste[i].titre);
+                        break;
+                    }
+                }
+                $("#unModal").modal();
+            }
+        }
+
+        function banUnBanSendDatas(id = $("#id").val(), val = $("#val").val()) {
+            if (parseInt(val) == 1) {
+                $("#unModal").modal('toggle')
+            } else if(!confirm("Êtes vous sure de vouloir De-bannir cette personne ?")) {
+                return;
+            }
+            let userToCede = $("#userToCede").val();
+            if (typeof(userToCede) == "undefined") {
+                userToCede = "";
+            }
+            console.log("id : "+id+" ; val : "+val+" ; userToCede : "+userToCede);
+
+            let formData = new FormData();
+            formData.append('id', id);
+            formData.append('val', val);
+            formData.append('userToCedeId', userToCede);
+
+
+            $.ajax({
+                url: 'http://' + window.location.hostname + ':8000/admin/banUnBan',
+                data: formData,
+                type: 'POST',
+                processData: false,
+                dataType: 'json',
+                contentType: false,
+                success: (data) => {
+                    $("#buttons_" + id).css("display", "");
+                    if (data.rep == "success") {
+                        if (val == 1) {
+                            $("#btBan_"+id).val("De-bannir");
+                            $("#btBan_"+id).attr("onclick","banUnBan(0,"+id+")");
+                        } else {
+                            $("#btBan_"+id).val("Bannir");
+                            $("#btBan_"+id).attr("onclick","banUnBan(1,"+id+")");
+                        }
+                        for (let i=0;i<liste.length;i++) {
+                            if (liste[i].id == id) {
+                                liste[i].banned = ((val == 1) ? true : false);
+                                break;
+                            }
+                        }
+                    } else if (data.rep == "failed") {
+                        let errorStr = "";
+                        for (let i = 0; i < data.errors.length; i++) {
+                            errorStr += data.errors[i] + "\n";
+                        }
+                        alert(errorStr);
+                    }
+                },
+                error: function (xhr, rrr, error) {
+                    alert(error);
+                }
+            });
+        }
+
+        function ChoiceCede() {
+            const choiced =  $("#ChoiceCede").prop("checked");
+            if (choiced) {
+                let str = "";
+                str += "à qui : <select id='userToCede'>";
+                str += "<option value=''>Choisir</option>";
+                {% for user in users %}
+                    {% if user.perm == "admin" %}
+                        str += "<option value='{{ user.id }}'>{{ user.prenom }} {{ user.nom }}</option>";
+                    {% endif %}
+                {% endfor %}
+                str += "</select>";
+                $("#formCede").html(str);
+            } else {
+                $("#formCede").html("");
+            }
+        }
+    </script>
+{% endblock %}

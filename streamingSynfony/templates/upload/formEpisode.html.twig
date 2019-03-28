@@ -1,0 +1,33 @@
+<h1>Upload episode</h1>
+<table>
+    <tr>
+        <td>Titre :</td><td><input type="text" id="titre"/></td>
+    </tr>
+    <tr>
+        <td>Duree :</td><td><input type="time" id="duree"/></td>
+    </tr>
+    <tr>
+        <td>Synopsis :</td><td><textarea id="synopsis"></textarea></td>
+    </tr>
+    <tr>
+        <td>Quelle serie : </td>
+        <td>
+            <select id="serie" onchange="serieChoiced()">
+                <option value="">Choisir</option>
+                {% for serie in series %}
+                    {% if serie.User.id == me.id %}
+                        <option value="{{ serie.id }}">{{ serie.nom }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </td>
+    </tr>
+    <tr id="saisons">
+    </tr>
+    <tr>
+        <td>Les URLs : </td><td><textarea id="URLs"></textarea></td>
+    </tr>
+    <tr>
+        <td colspan="2"><br/><center><input style="width: 150px;" type="button" value="Valider" onclick="uploadEpisode()"/></center></td>
+    </tr>
+</table>

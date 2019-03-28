@@ -1,0 +1,145 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}modifier {{ serie.nom }}{% endblock %}
+
+{% block body %}
+    <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
+    <br/>
+    <h1>Modifier {{ serie.nom }}</h1>
+    <br/>
+    <br/>
+    <table>
+        <tr>
+            <td>Nom : </td><td><input id="nom" type="text"/></td>
+        </tr>
+        <tr>
+            <td>Synopsis : </td><td><textarea id="synopsis"></textarea></td>
+        </tr>
+        <tr>
+            <td>Prénom de l'auteur :</td><td><input type="text" id="prenomAuteur"/></td>
+        </tr>
+        <tr>
+            <td>Nom de l'auteur :</td><td><input type="text" id="nomAuteur"/></td>
+        </tr>
+        <tr>
+            <td>Changer l'image </td><td><input type="file" id="imageSagaSelect"/></td>
+        </tr>
+        <tr>
+            <td>Date de sortie : </td><td><input id="dateS" type="date"/></td>
+        </tr>
+        <tr>
+            <td>La catégorie:</td><td>
+                <select id="categorie">
+                    <option value="">Choisissez</option>
+                    {% for categorie in categories %}
+                        <option value="{{ categorie.id }}">{{ categorie.nom }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>Changer le propriétaire</td><td>
+                <select id="proprio" onchange="proprioChanged()">
+                    {% if me.perm == "admin" %}
+                        <option value="{{ me.id }}">{{ me.prenom }} {{ me.nom }}</option>
+                    {% endif %}
+                    {% for user in users %}
+                        {% if user.perm == "uploader" %}
+                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                <span id="allChildren" style="display: none;">Toute ses saisons et episodes<input type="checkbox"></span>
+            </td>
+        </tr>
+    </table>
+    <div id="msg"></div>
+    <br/>
+    <input type="button" value="Appliquer" onclick="modifSerie()"/>
+{% endblock %}
+{% block javascripts %}
+<script>
+    let proprio = "{{ me.id }}";
+
+    $("#nom").val(`{{ serie.nom|raw }}`);
+    $("#synopsis").val(`{{ serie.synopsis|replace({"\n": "\\n", "\r": "\\r"})|raw }}`);
+    $("#prenomAuteur").val(`{{ serie.prenomAuteur|raw }}`);
+    $("#nomAuteur").val(`{{ serie.nomAuteur|raw }}`);
+    $("#categorie").val(`{{ serie.categorie.id }}`);
+    $("#dateS").val("{{ serie.dateSortie|date("Y-m-d") }}");
+    $("#proprio").val("{{ me.id }}");
+
+    function modifSerie() {
+        const nom = $("#nom").val();
+        const synopsis = $("#synopsis").val();
+        const prenomAuteur = $("#prenomAuteur").val();
+        const nomAuteur = $("#nomAuteur").val();
+        const idCategorie = $("#categorie").val();
+        const idProprio = $("#proprio").val();
+        const allChildren = $($("#allChildren > input")[0]).prop("checked");
+        const files = document.getElementById("imageSagaSelect").files;
+
+        let formData = new FormData();
+        formData.append("id", {{ serie.id }});
+        formData.append('nom', nom);
+        formData.append('synopsis', synopsis);
+        formData.append('prenomAuteur', prenomAuteur);
+        formData.append('nomAuteur', nomAuteur);
+        formData.append('idCategorie', idCategorie);
+        formData.append('idProprio', idProprio);
+        formData.append('allChildren', allChildren);
+        if (files.length === 1) {
+            formData.append('image', files[0], files[0].name);
+        }
+        $.ajax({
+            url: 'http://'+window.location.hostname+':8000/modif/applySerie',
+            data: formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    location.href = "{{ referer }}";
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+
+    }
+
+    function proprioChanged() {
+        if ($("#proprio").val() == "{{ me.id }}") {
+            proprio = $("#proprio").val();
+            $("#allChildren").css("display", "none");
+            return;
+        }
+        if (proprio != "{{ me.id }}") {
+            proprio = $("#proprio").val();
+            $("#allChildren").css("display", "");
+            return;
+        }
+        if (confirm("ATTENTION! Si vous attribuez ce film à quelqu'un d'autre, vous ne pourrez plus rien faire dessus\nVoulez vous continuer?")) {
+            proprio = $("#proprio").val();
+            $("#allChildren").css("display", "");
+            return;
+        } else {
+            $("#proprio").val(proprio);
+        }
+    }
+
+</script>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Episodes de {{ user.prenom }} {{ user.nom }} - Site de streaming{% endblock %}
+
+{% block body %}
+    Filtres :
+    <br/>
+    <table style="border-spacing: 5px; border-collapse: separate;">
+        <tr>
+            <td>
+                Par nom :<input type="text" id="filtreNom" />
+            </td>
+            <td>
+                Trier : <select id="filtreTrie">
+                    <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                    <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align: center;" colspan="2">
+                <input type="button" value="Appliquer" onclick="filtre()"/>
+            </td>
+        </tr>
+    </table>
+    <h1>Episodes de {{ user.prenom }} {{ user.nom }}: </h1>
+    <br/>
+    <div id="displayEpisode"></div>
+{% endblock %}
+{% block javascripts %}
+    {% include 'filtres/javascript.twig' %}
+    <script>
+        let liste = [];
+
+        {% for episode in user.episodes %}
+        liste.push({
+            id: {{ episode.id }}, titre: "{{ episode.titre }}", duree: "{{ episode.duree|date('H:i') }}",
+            {% if app.user %}
+            your: {{ (episode.User.id == me.id) ? "true" : "false" }}
+            {% else %}
+            your: false
+            {% endif %}
+        });
+        {% endfor %}
+
+        if (liste.length == 0) {
+            $("#displayEpisode").html("<font size='3' color='orange'>Il n'y a aucun episode</font>");
+        } else {
+            liste = trieAlphabetique("croissant", liste);
+            display(liste);
+        }
+        function display(episodeList) {
+            if (episodeList.length == 0) {
+                $("#displayEpisode").html("<font size='3' color='orange'>Aucun episode trouvé</font>")
+                return;
+            }
+            let listStr = "<center><table>";
+            for (let i=0;i<episodeList.length;i++) {
+                let lien = "/series/viewEpisode?id="+episodeList[i].id;
+                listStr += "<tr><td>";
+                listStr += "<a href='"+lien+"'><strong>"+episodeList[i].titre+"</strong></a>";
+                listStr += "</td>";
+                if (episodeList[i].your || (ownPerm === "admin" & episodeList[i].permUploader !== "admin")) {
+                    if (episodeList[i].your) {
+                        listStr += "<td><input onclick='location.href = `/modif/episode?id=" + episodeList[i].id + "`' type='button' value='modifier' /></td>";
+                        listStr += "<td><input type='button' value='supprimer' onclick='supprEpisode("+episodeList[i].id+")'/></td>";
+                    } else {
+                        listStr += "<td><input type='button' value='supprimer' onclick='supprEpisode("+episodeList[i].id+")'/></td>";
+                        listStr += "<td></td>";
+                    }
+                } else {
+                    listStr += "<td></td><td></td>";
+                }
+                listStr += "</tr>";
+            }
+            listStr += "</table></center>";
+            $("#displayEpisode").html(listStr);
+        }
+
+        function supprEpisode(id) {
+            if (!confirm("Êtes vous sûre de vouloir le supprimer ?")) {
+                return;
+            }
+            let formData = new FormData();
+            formData.append('id', id);
+
+            $.ajax({
+                url:'http://'+window.location.hostname+':8000/series/deleteEpisode',
+                data:formData,
+                type:'POST',
+                processData: false,
+                dataType: 'json',
+                contentType: false,
+                success: (data) =>
+                {
+                    $("#buttons_"+id).css("display", "");
+                    if (data.rep == "success") {
+                        window.location.reload();
+                    } else if (data.rep == "failed") {
+                        let errorStr = "";
+                        for (let i=0;i<data.errors.length;i++) {
+                            errorStr += data.errors[i]+"\n";
+                        }
+                        alert(errorStr);
+                    }
+                },
+                error:function(xhr,rrr,error)
+                {
+                    alert(error);
+                }
+            });
+        }
+    </script>
+{% endblock %}

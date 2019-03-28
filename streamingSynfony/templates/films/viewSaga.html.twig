@@ -1,0 +1,143 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ saga.nom }}- Site de streaming{% endblock %}
+
+{% block body %}
+    {% if referer|slice(24,11) == "/films/view" %}
+        <input type="button" value="<=" onclick="location.href = '/films'"/>
+    {% else %}
+        <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
+    {% endif %}
+    <br/>
+    Filtres :
+    <br/>
+    <table style="border-spacing: 5px; border-collapse: separate;">
+        <tr>
+            <td>
+                Par nom :<input type="text" id="filtreNom" />
+            </td>
+            <td>
+                Par Uploader :<select id="filtreUploader">
+                    <option value="">Tous</option>
+                    {% for user in users %}
+                        {% if user.perm == "uploader" or user.perm == "admin" %}
+                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                Trier : <select id="filtreTrie">
+                    <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                    <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align: center;" colspan="3">
+                <input type="button" value="Appliquer" onclick="filtre()"/>
+            </td>
+        </tr>
+    </table>
+    <h1>{{ saga.nom }} ({{ saga.categorie.nom }}) : </h1>
+    <br/>
+    <div id="displayFilm"></div>
+{% endblock %}
+{% block javascripts %}
+    {% include 'filtres/javascript.twig' %}
+    <script>
+        let liste = [];
+        {% for film in saga.films %}
+            liste.push({
+                id: {{ film.id }}, titre: "{{ film.titre }}", duree: "{{ film.duree|date('H:i') }}",
+                image: "{{ film.image }}",
+                {% if app.user %}
+                    your: {{ (film.User.id == me.id) ? "true" : "false" }},
+                {% else %}
+                    your: false,
+                {% endif %}
+                permUploader: "{{ saga.User.perm }}",
+                idUploader: {{ saga.User.id }},
+                nameUploader: "{{ saga.User.prenom }} {{ saga.User.nom }}"
+            });
+        {% endfor %}
+
+        if (liste.length == 0) {
+            $("#displayFilm").html("<font size='3' color='orange'>Il n'y a aucun film</font>");
+        } else {
+            liste = trieAlphabetique("croissant", liste);
+            display(liste);
+        }
+        $("#filtreUploader").val({{ idUploader }});
+        if ("{{ idUploader }}" !== "") {
+            filtre();
+        }
+        function display(filmList) {
+            if (filmList.length == 0) {
+                $("#displayFilm").html("<font size='3' color='orange'>Aucun film trouvé</font>")
+                return;
+            }
+            let top = 260;
+            let left = 400;
+            let listStr = "<br><br><br><br><br><br><br><br><br><br><br><br><br><br>";
+            listStr += "<table>";
+            for (let i=0;i<filmList.length;i++) {
+                const lien = "/films/view?id="+filmList[i].id;
+                const textBottom = filmList[i].duree;
+                listStr += "<tr><td>";
+                listStr += "<p style='position: absolute; top: "+(top-20)+"px; left: "+left+"px;'><strong>"+filmList[i].titre+"</strong></p><br/>";
+                listStr += "<a href='"+lien+"'><img src='"+filmList[i].image+"' style='position: absolute; top: "+top+"px; left: "+left+"px; width: 170px; height: 225px;' /></a>";
+                listStr += "<p style='position: absolute; top: "+(top+205)+"px; left: "+(left+135)+"px; z-index: 2; background-color: #000; color: #fff;'>"+textBottom+"</p>";
+                if (filmList[i].your || (ownPerm === "admin" & filmList[i].permUploader !== "admin")) {
+                    listStr += "<input onclick='supprFilm("+filmList[i].id+")' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + left + "px' type='button' value='supprimer' />";
+                    if (filmList[i].your) {
+                        listStr += "<input onclick='location.href = `/modif/film?id=" + filmList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
+                    }
+                }
+                listStr += "</td></tr>";
+                left += 230;
+                if (left >= 400+(230*3)) {
+                    listStr += "<br><br><br><br><br><br><br><br><br><br><br><br>";
+                    left = 400;
+                    top += 300;
+                }
+            }
+            listStr += "</table>";
+            $("#displayFilm").html(listStr);
+        }
+
+        function supprFilm(id) {
+            if (!confirm("Êtes vous sûre de vouloir le supprimer ?")) {
+                return;
+            }
+            let formData = new FormData();
+            formData.append('id', id);
+
+            $.ajax({
+                url:'http://'+window.location.hostname+':8000/films/deleteFilm',
+                data:formData,
+                type:'POST',
+                processData: false,
+                dataType: 'json',
+                contentType: false,
+                success: (data) =>
+                {
+                    $("#buttons_"+id).css("display", "");
+                    if (data.rep == "success") {
+                        window.location.reload();
+                    } else if (data.rep == "failed") {
+                        let errorStr = "";
+                        for (let i=0;i<data.errors.length;i++) {
+                            errorStr += data.errors[i]+"\n";
+                        }
+                        alert(errorStr);
+                    }
+                },
+                error:function(xhr,rrr,error)
+                {
+                    alert(error);
+                }
+            });
+        }
+    </script>
+{% endblock %}

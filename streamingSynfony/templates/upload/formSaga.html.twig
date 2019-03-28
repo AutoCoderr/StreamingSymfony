@@ -1,0 +1,31 @@
+<h1>Upload saga</h1>
+<table>
+    <tr>
+        <td>nom :</td><td><input type="text" id="nom"/></td>
+    </tr>
+    <tr>
+        <td>Synopsis :</td><td><textarea id="synopsis"></textarea></td>
+    </tr>
+    <tr>
+        <td>Prénom de l'auteur:</td><td><input type="text" id="prenomAuteur"/></td>
+    </tr>
+    <tr>
+        <td>Nom de l'auteur:</td><td><input type="text" id="nomAuteur"/></td>
+    </tr>
+    <tr>
+        <td>l'image: </td><td><input type="file" id="imageSagaSelect"/></td>
+    </tr>
+    <tr>
+        <td>La catégorie:</td><td>
+            <select id="categorie">
+                <option value="">Choisissez</option>
+                {% for categorie in categories %}
+                    <option value="{{ categorie.id }}">{{ categorie.nom }}</option>
+                {% endfor %}
+            </select>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2"><br/><center><input style="width: 150px;" type="button" value="Valider" onclick="uploadSaga()"/></center></td>
+    </tr>
+</table>

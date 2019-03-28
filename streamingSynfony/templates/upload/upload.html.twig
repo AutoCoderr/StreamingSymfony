@@ -1,0 +1,394 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Upload - site de streaming{% endblock %}
+
+{% block body %}
+    Que voulez vous uploader ?
+    <select id="type" onchange="choiceType()">
+        <option value="">Choisissez</option>
+        <option value="film">Un film</option>
+        <option value="saga">Une Saga</option>
+        <option value="">-</option>
+        <option value="serie">Une Série</option>
+        <option value="saison">Une Saison</option>
+        <option value="episode">Un episode</option>
+    </select>
+    <br/>
+    <br/>
+    <div style="text-align: left; margin-left: 37%;">
+        <div id="form"></div>
+        <br/>
+        <div style="margin-left: 21%;" id="msg"></div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+
+    let saisons = {};
+    {% for serie in series %}
+        saisons[{{ serie.id }}] = [];
+        {% for saison in serie.saisons %}
+            {% if saison.User.id == me.id %}
+                saisons[{{ serie.id }}].push({id: {{ saison.id }}, nom: "{{ saison.nom}}"});
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+
+    function choiceType() {
+        switch($("#type").val()) {
+            case "":
+                $("#form").html("");
+                break;
+            case "film":
+                $("#form").html(`{% include 'upload/formFilm.html.twig' %}`);
+                break;
+            case "saga":
+                $("#form").html(`{% include 'upload/formSaga.html.twig' %}`);
+                break;
+            case "serie": {
+                $("#form").html(`{% include 'upload/formSerie.html.twig' %}`);
+                break;
+            }
+            case "saison": {
+                $("#form").html(`{% include 'upload/formSaison.html.twig' %}`);
+                break;
+            }
+            case "episode": {
+                $("#form").html(`{% include 'upload/formEpisode.html.twig' %}`);
+                break;
+            }
+        }
+    }
+
+    function uploadSaison() {
+        const nom = $("#nom").val();
+        const idSerie = $("#serie").val();
+        const imageSaisonSelect = document.getElementById('imageSaisonSelect');
+        let file = imageSaisonSelect.files;
+        file = file[0];
+        if (typeof(file) == "undefined") {
+            $("#msg").html("<font color='red'>Fichier non selectionné</font>");
+            return;
+        }
+        if (!file.type.match('image.*')) {
+            $("#msg").html("<font color='red'>Ce fichier n'est pas une image jpeg</font>");
+            return;
+        }
+        let formData = new FormData();
+        formData.append('image', file, file.name);
+        formData.append('nom', nom);
+        formData.append('idSerie', idSerie);
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/upload/sendSaison',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    $("#msg").html("<font color='green' size='4'>Upload réussi!</font>");
+                    $("#nom").val("");
+                    $("#serie").val("");
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+
+    function uploadSerie() {
+        const nom = $("#nom").val();
+        const synopsis = $("#synopsis").val();
+        const prenomAuteur = $("#prenomAuteur").val();
+        const nomAuteur = $("#nomAuteur").val();
+        const idCategorie = $("#categorie").val();
+        const dateS = $("#dateS").val();
+        const imageSerieSelect = document.getElementById('imageSerieSelect');
+        let file = imageSerieSelect.files;
+        file = file[0];
+        if (typeof(file) == "undefined") {
+            $("#msg").html("<font color='red'>Fichier non selectionné</font>");
+            return;
+        }
+        if (!file.type.match('image.*')) {
+            $("#msg").html("<font color='red'>Ce fichier n'est pas une image jpeg</font>");
+            return;
+        }
+        let formData = new FormData();
+        formData.append('image', file, file.name);
+        formData.append('nom', nom);
+        formData.append('synopsis', synopsis);
+        formData.append('prenomAuteur', prenomAuteur);
+        formData.append('nomAuteur', nomAuteur);
+        formData.append('dateS', dateS);
+        formData.append('idCategorie', idCategorie);
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/upload/sendSerie',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    $("#msg").html("<font color='green' size='4'>Upload réussi!</font>");
+                    $("#nom").val("");
+                    $("#synopsis").val("");
+                    $("#prenomAuteur").val("");
+                    $("#nomAuteur").val("");
+                    $("#categorie").val("");
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+
+
+    function uploadSaga() {
+        const nom = $("#nom").val();
+        const synopsis = $("#synopsis").val();
+        const prenomAuteur = $("#prenomAuteur").val();
+        const nomAuteur = $("#nomAuteur").val();
+        const idCategorie = $("#categorie").val();
+        const imageSagaSelect = document.getElementById('imageSagaSelect');
+        let file = imageSagaSelect.files;
+        file = file[0];
+        if (typeof(file) == "undefined") {
+            $("#msg").html("<font color='red'>Fichier non selectionné</font>");
+            return;
+        }
+        if (!file.type.match('image.*')) {
+            $("#msg").html("<font color='red'>Ce fichier n'est pas une image jpeg</font>");
+            return;
+        }
+        let formData = new FormData();
+        formData.append('image', file, file.name);
+        formData.append('nom', nom);
+        formData.append('synopsis', synopsis);
+        formData.append('prenomAuteur', prenomAuteur);
+        formData.append('nomAuteur', nomAuteur);
+        formData.append('idCategorie', idCategorie);
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/upload/sendSaga',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    $("#msg").html("<font color='green' size='4'>Upload réussi!</font>");
+                    $("#nom").val("");
+                    $("#synopsis").val("");
+                    $("#prenomAuteur").val("");
+                    $("#nomAuteur").val("");
+                    $("#categorie").val("");
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+
+    function uploadEpisode() {
+        const titre = $("#titre").val();
+        const duree = $("#duree").val();
+        const synopsis = $("#synopsis").val();
+
+        if (typeof($("#saison").val()) == "undefined") {
+            $("#msg").html("<font color='red'>Série non spécifiée</font>");
+            return;
+        }
+        const idSaison = $("#saison").val();
+
+        const URLs = remplace($("#URLs").val(),"\n",",");
+        let formData = new FormData();
+        formData.append('titre', titre);
+        formData.append('duree', duree);
+        formData.append('synopsis', synopsis);
+        formData.append('idSaison', idSaison);
+        formData.append('URLs', URLs);
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/upload/sendEpisode',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    $("#msg").html("<font color='green' size='4'>Upload réussi!</font>");
+                    $("#titre").val("");
+                    $("#duree").val("");
+                    $("#saisons").html("");
+                    $("#serie").val("");
+                    $("#synopsis").val("");
+                    $("#dateS").val("");
+                    $("#URLs").val("");
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+
+    function uploadFilm() {
+        const titre = $("#titre").val();
+        const duree = $("#duree").val();
+        const synopsis = $("#synopsis").val();
+        const dateS = $("#dateS").val();
+
+        const idSaga = $("#saga").val();
+        let prenomAuteur;
+        let nomAuteur;
+        let idCategorie;
+        if (idSaga == "") {
+            prenomAuteur = $("#prenomAuteur").val();
+            nomAuteur = $("#nomAuteur").val();
+            idCategorie = $("#categorie").val();
+        } else {
+            prenomAuteur = "";
+            nomAuteur = "";
+            idCategorie = "";
+        }
+        const imageFilmSelect = document.getElementById('imageFilmSelect');
+        const URLs = remplace($("#URLs").val(),"\n",",");
+        let file = imageFilmSelect.files;
+        file = file[0];
+        if (typeof(file) == "undefined") {
+            $("#msg").html("<font color='red'>Fichier non selectionné</font>");
+            return;
+        }
+        if (!file.type.match('image.*')) {
+            $("#msg").html("<font color='red'>Ce fichier n'est pas une image jpeg</font>");
+            return;
+        }
+        let formData = new FormData();
+        formData.append('image', file, file.name);
+        formData.append('titre', titre);
+        formData.append('duree', duree);
+        formData.append('synopsis', synopsis);
+        formData.append('dateS', dateS);
+        formData.append('idSaga', idSaga);
+        formData.append('prenomAuteur', prenomAuteur);
+        formData.append('nomAuteur', nomAuteur);
+        formData.append('idCategorie', idCategorie);
+        formData.append('URLs', URLs);
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/upload/sendFilm',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    $("#msg").html("<font color='green' size='4'>Upload réussi!</font>");
+                    $("#titre").val("");
+                    $("#duree").val("");
+                    $("#synopsis").val("");
+                    $("#dateS").val("");
+                    $("#prenomAuteur").val("");
+                    $("#nomAuteur").val("");
+                    $("#categorie").val("");
+                    $("#URLs").val("");
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+
+    function sagaChoiced() {
+        const saga = $("#saga").val();
+        if (saga == "") {
+            $("#PrenomNomEtCategorie").css("display","");
+        } else {
+            $("#PrenomNomEtCategorie").css("display","none");
+        }
+    }
+
+    function serieChoiced() {
+        const serie = $("#serie").val();
+        if (serie == "") {
+            $("#saisons").html("");
+        } else {
+            let saisonStr = "<td>Quelle saison : </td><td><select id='saison'>";
+            saisonStr += "<option value=''>Choisir</option>";
+            for (let i=0;i<saisons[parseInt(serie)].length;i++) {
+                saisonStr += "<option value='"+saisons[parseInt(serie)][i].id+"'>"+saisons[parseInt(serie)][i].nom+"</option>";
+            }
+            saisonStr += "</select></td>";
+            $("#saisons").html(saisonStr);
+        }
+    }
+</script>
+{% endblock %}

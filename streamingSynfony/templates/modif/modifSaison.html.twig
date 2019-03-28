@@ -1,0 +1,124 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}modifier {{ saison.nom }}{% endblock %}
+
+{% block body %}
+    <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
+    <br/>
+    <h1>Modifier {{ saison.nom }}</h1>
+    <br/>
+    <br/>
+    <table>
+        <tr>
+            <td>Nom : </td><td><input id="nom" type="text"/></td>
+        </tr>
+        <tr>
+            <td>Changer l'image </td><td><input type="file" id="imageSaisonSelect"/></td>
+        </tr>
+        <tr>
+            <td>La série</td><td>
+                <select id="serie">
+                    {% for serie in series %}
+                        {% if serie.User.id == me.id or serie.id == saison.serie.id %}
+                            <option value="{{ serie.id }}">{{ serie.nom }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>Changer le propriétaire</td><td>
+                <select id="proprio" onchange="proprioChanged()">
+                    {% if me.perm == "admin" %}
+                        <option value="{{ me.id }}">{{ me.prenom }} {{ me.nom }}</option>
+                    {% endif %}
+                    {% for user in users %}
+                        {% if user.perm == "uploader" %}
+                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                <span id="allChildren" style="display: none;">Tout ses episodes<input type="checkbox"></span>
+            </td>
+        </tr>
+    </table>
+    <div id="msg"></div>
+    <br/>
+    <input type="button" value="Appliquer" onclick="modifSerie()"/>
+{% endblock %}
+{% block javascripts %}
+<script>
+    let proprio = "{{ me.id }}";
+
+    $("#nom").val(`{{ saison.nom|raw }}`);
+    $("#proprio").val("{{ me.id }}");
+    $("#serie").val("{{ saison.serie.id }}");
+
+    function modifSerie() {
+        const nom = $("#nom").val();
+        const idProprio = $("#proprio").val();
+        const allChildren = $($("#allChildren > input")[0]).prop("checked");
+        const files = document.getElementById("imageSaisonSelect").files;
+        const idSerie = $("#serie").val();
+
+        let formData = new FormData();
+        formData.append("id", {{ saison.id }});
+        formData.append('nom', nom);
+        formData.append('idSerie', idSerie);
+        formData.append('idProprio', idProprio);
+        formData.append('allChildren', allChildren);
+        if (files.length === 1) {
+            formData.append('image', files[0], files[0].name);
+        }
+        $.ajax({
+            url: 'http://'+window.location.hostname+':8000/modif/applySaison',
+            data: formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    location.href = "{{ referer }}";
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+
+    }
+
+    function proprioChanged() {
+        if ($("#proprio").val() == "{{ me.id }}") {
+            proprio = $("#proprio").val();
+            $("#allChildren").css("display", "none");
+            return;
+        }
+        if (proprio != "{{ me.id }}") {
+            proprio = $("#proprio").val();
+            $("#allChildren").css("display", "");
+            return;
+        }
+        if (confirm("ATTENTION! Si vous attribuez ce film à quelqu'un d'autre, vous ne pourrez plus rien faire dessus\nVoulez vous continuer?")) {
+            proprio = $("#proprio").val();
+            $("#allChildren").css("display", "");
+            return;
+        } else {
+            $("#proprio").val(proprio);
+        }
+    }
+
+</script>
+{% endblock %}

@@ -1,0 +1,268 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ film.titre }}- Site de streaming{% endblock %}
+
+{% block body %}
+    <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
+    <h1>{{ film.titre }}</h1>
+    <table>
+        <tr>
+            {% set nbL = 1 %}
+            {% for url in film.uRLs %}
+                <td>
+                    <input id='bt_{{ nbL }}' type="button" value="lien {{ nbL }}" onclick="displayLien('{{ url.lien }}')"/>
+                </td>
+                {% set nbL = nbL +1 %}
+            {% endfor %}
+        </tr>
+    </table>
+    <div id="displayLien"></div>
+    <h2>Commentaires : </h2>
+    <table id="commentaireList">
+        {% for commentaire in film.commentaires %}
+            <tr id='comment_{{ commentaire.id }}' style='border: 1px solid black;'>
+                <td>
+                    <table>
+                        <tr style='border: 1px solid black;'>
+                            <td>
+                                {{ commentaire.user.prenom }} {{ commentaire.user.nom }} [{{ commentaire.dateTime|date("Y-m-d H:i") }}] :
+                            </td>
+                        </tr>
+                        <tr style='border: 1px solid black;'>
+                            <td id="content_{{ commentaire.id }}">
+                                {{ commentaire.contenu|raw|replace({"<" : "&lt;", ">" : "&gt;"})|replace({"\n": "<br/>", "\r\n": "<br/>", "\t": "<br/>", "\n\r": "<br/>", '"': '\\"'})|replace({"&lt;surlign&gt;": "<surlign>", "&lt;/surlign&gt;": "</surlign>"})|raw }}
+                            </td>
+                            {% if app.user %}
+                                {% if commentaire.user.id == me.id  or (commentaire.user.perm != "admin" and ((commentaire.user.perm != "moderateur" and me.perm == "moderateur") or me.perm == "admin")) %}
+                                    <td id="buttons_{{ commentaire.id }}" >
+                                        <table>
+                                            <tr>
+                                                {% if commentaire.user.id == me.id %}
+                                                    <td>
+                                                        <input type="button" value="Éditer" onclick="editForm({{ commentaire.id }})">
+                                                    </td>
+                                                {% endif %}
+                                                <td>
+                                                    <input type="button" value="Supprimer" onclick="supprCommentaire({{ commentaire.id }})">
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                {% endif %}
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <td style="height: 20px"></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
+    {% if app.user %}
+        <textarea id="commentaire" style="width: 556px; height: 100px;"></textarea><br/>
+        <div id="errorCommentaire"></div>
+        <input type="button" value="Envoyer" onclick="sendCommentaire()"/>
+        {% if  me.perm == "moderateur" or me.perm == "admin" %}
+            Surligner : <input id="surlignCommentaire" type="checkbox">
+        {% endif %}
+    {% else %}
+        <font color="orange" size="3">Vous devez vous inscrire pour pouvoir poster des commentaires.</font>
+    {% endif %}
+    <br/>
+    Date de sortie : {{ film.dateSortie|date("d/m/Y") }}<br/>
+    Auteur :
+    {% if film.saga == null %}
+        {{ film.prenomAuteur }} {{ film.nomAuteur }}
+    {% else %}
+        {{ film.saga.prenomAuteur }} {{ film.saga.nomAuteur }}
+    {% endif %}
+    <p>Synopsis : <br/>
+        {{ film.synopsis|raw|replace({"<" : "&lt;", ">" : "&gt;"})|replace({"\n": "<br/>", "\r\n": "<br/>", "\t": "<br/>", "\n\r": "<br/>", '"': '\\"'})|raw }}</p>
+    <br/>
+    <br/>
+{% endblock %}
+{% block javascripts %}
+<script>
+    {% if app.user %}
+        let prenom = "{{ me.prenom }}";
+        let nom = "{{ me.nom }}";
+    {% endif %}
+    let contentComment = "";
+
+    $("#bt_1").click();
+    function displayLien(lien) {
+        $("#displayLien").html("<iframe allowfullscreen='true' style='width: 800px; height: 450px;' src='"+lien+"' ></iframe>");
+    }
+
+    function editForm(id) {
+        $("#buttons_"+id).css("display", "none");
+        contentComment = $("#content_"+id).html();
+        if (areSpace(id)) {
+            contentComment = contentComment.substring(33,contentComment.length-29);
+        }
+        $("#content_"+id).html("<textarea style='width: 417px; height: 96px;' >"+remplace(contentComment,"<br>","\n")+"</textarea><br/><input type='button' value='Valider' onclick='edit("+id+")'/>"+
+        "<input type='button' value='Annuler' onclick='editAnnule("+id+")'/>");
+    }
+
+    function editAnnule(id) {
+        $("#buttons_"+id).css("display", "");
+        $("#content_"+id).html(contentComment);
+    }
+
+    function areSpace(id) {
+        const content = $("#content_"+id).html();
+        if (remplace(content.substring(0,33)," ","").length == 1 & remplace(content.substring(content.length-29,content.length)," ","").length == 1 &
+            remplace(content.substring(0,33)," ","") == "\n" & remplace(content.substring(content.length-29,content.length)," ","") == "\n") {
+            return true;
+        }
+        return false;
+    }
+
+    function edit(id) {
+        const content = $("#content_"+id+" > textarea").val();
+        let formData = new FormData();
+        formData.append('content', content);
+        formData.append('id', id);
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/commentaires/edit',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            contentType: false,
+            success: (data) =>
+            {
+                $("#buttons_"+id).css("display", "");
+                if (data.rep == "success") {
+                    $("#content_"+id).html(remplace(remplace(remplace(remplace(content,">","&lt;"),"<","&lt;"),"\n","<br/>"),"\r","<br/>"));
+                } else if (data.rep == "failed") {
+                    $("#content_"+id).html(contentComment);
+                    $("#errorCommentaire").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#errorCommentaire").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+
+    function sendCommentaire() {
+        const commentaire = $("#commentaire").val();
+        let formData = new FormData();
+        formData.append('commentaire', commentaire);
+        formData.append('idMetrage', {{ film.id }});
+        {% if app.user %}
+            {% if me.perm == "moderateur" or me.perm == "admin" %}
+                formData.append('surlign',$("#surlignCommentaire").prop("checked"));
+            {% endif %}
+        {% endif %}
+        formData.append('typeMetrage', "film");
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/commentaires/send',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    $("#errorCommentaire").empty();
+                    $("#errorCommentaire").append("<font color='green' size='3'>Envoyé</font>");
+                    $("#commentaire").val("");
+                    const date = new Date();
+                    let str = "<tr id='comment_"+data.id+"' style='border: 1px solid black;'>\n" +
+                                "<td>\n" +
+                                    "<table>\n" +
+                                        "<tr style='border: 1px solid black;'>\n" +
+                                            "<td>\n" +
+                                                prenom+" "+nom+" ["+date.getFullYear()+"-"+(date.getMonth()+1)+"-"+date.getDate()+" "+date.getHours()+":"+date.getMinutes()+"] :\n" +
+                                            "</td>\n" +
+                                        "</tr>\n" +
+                                        "<tr style='border: 1px solid black;'>\n" +
+                                            "<td id='content_"+data.id+"'>\n";
+                                                if ($("#surlignCommentaire").prop("checked") == true) {
+                                                    str += "<surlign>" + remplace(remplace(remplace(remplace(commentaire, ">", "&gt;"), "<", "&lt;"), "\n", "<br/>"), "\r", "<br/>") + "</surlign>";
+                                                } else {
+                                                    str += remplace(remplace(remplace(remplace(commentaire, ">", "&gt;"), "<", "&lt;"), "\n", "<br/>"), "\r", "<br/>");
+                                                }
+                                     str += "</td>\n" +
+                                            "<td id='buttons_"+data.id+"' >\n" +
+                                                "<table>\n" +
+                                                     "<tr>\n" +
+                                                        "<td>\n" +
+                                                            "<input type='button' value='Éditer' onclick='editForm("+data.id+")'>\n" +
+                                                        "</td>\n" +
+                                                        "<td>\n" +
+                                                            "<input type='button' value='Supprimer' onclick='supprCommentaire("+data.id+")'>\n" +
+                                                        "</td>\n" +
+                                                    "</tr>\n" +
+                                                "</table>\n" +
+                                            "</td>\n" +
+                                        "</tr>\n" +
+                                        "<tr>\n" +
+                                            "<td style='height: 20px'></td>\n" +
+                                        "</tr>\n" +
+                                    "</table>\n" +
+                                "</td>\n" +
+                            "</tr>";
+                    $("#commentaireList").append(str);
+                } else if (data.rep == "failed") {
+                    $("#errorCommentaire").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#errorCommentaire").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+
+    function supprCommentaire(id) {
+        let formData = new FormData();
+        formData.append('id', id);
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/commentaires/suppr',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    $("#comment_"+id).remove();
+                } else if (data.rep == "failed") {
+                    $("#errorCommentaire").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#errorCommentaire").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    }
+</script>
+{% endblock %}

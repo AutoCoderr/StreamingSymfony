@@ -1,0 +1,11 @@
+{% extends 'base.html.twig' %}
+{% block title %}Deconnexion{% endblock %}
+{% block body %}
+<script>
+	if(confirm("Voulez-vous vous deconnecter ?")) {
+		location.href = "/logout";
+	} else {
+		location.href = document.referrer;
+	}
+</script>
+{% endblock %}

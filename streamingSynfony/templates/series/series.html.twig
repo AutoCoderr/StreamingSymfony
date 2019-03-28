@@ -1,0 +1,155 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Séries - Site de streaming{% endblock %}
+
+{% block body %}
+    Filtres :
+    <br/>
+    <table style="border-spacing: 5px; border-collapse: separate;">
+        <tr>
+            <td>
+                Par categorie :
+                <select id="filtreCategorie">
+                    <option value="">Tous</option>
+                    {% for categorie in categories %}
+                        <option value="{{ categorie.nom }}">{{ categorie.nom }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                Par nom :<input type="text" id="filtreNom" />
+            </td>
+            <td>
+                Par Uploader :<select id="filtreUploader">
+                    <option value="">Tous</option>
+                    {% for user in users %}
+                        {% if user.perm == "uploader" or user.perm == "admin" %}
+                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                Trier : <select id="filtreTrie">
+                    <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                    <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align: center;" colspan="4">
+                <input type="button" value="Appliquer" onclick="filtre()"/>
+            </td>
+        </tr>
+    </table>
+    <h1>Les series</h1>
+    <br/>
+    <div id="displaySerie"></div>
+{% endblock %}
+{% block javascripts %}
+    {% include 'filtres/javascript.twig' %}
+    <script>
+        let liste = [];
+
+        {% for serie in series %}
+        liste.push({
+            id: {{ serie.id }}, titre: "{{ serie.nom }}",
+            categorie: "{{ serie.categorie.nom }}",
+            image: "{{ serie.image }}",
+            {% if app.user %}
+                your: {{ (serie.User.id == me.id) ? "true" : "false" }},
+            {% else %}
+               your: false,
+            {% endif %}
+            permUploader: "{{ serie.User.perm }}",
+            idUploader: {{ serie.User.id }},
+            nameUploader: "{{ serie.User.prenom }} {{ serie.User.nom }}"
+        });
+        {% endfor %}
+
+        if (liste.length == 0) {
+            $("#displaySerie").html("<font size='3' color='orange'>Il n'y a aucune série</font>");
+        } else {
+            liste = trieAlphabetique("croissant", liste);
+            display(liste);
+        }
+        $("#filtreUploader").val({{ idUploader }});
+        if ("{{ idUploader }}" !== "") {
+            filtre();
+        }
+        function display(serieList) {
+            if (serieList.length == 0) {
+                $("#displaySerie").html("<font size='3' color='orange'>Aucune serie trouvée</font>")
+                return;
+            }
+            let top = 240;
+            let left = 400;
+            let listStr = "<br><br><br><br><br><br><br><br><br><br><br><br><br><br>";
+            listStr += "<table>";
+            for (let i=0;i<serieList.length;i++) {
+                let lien;
+                let textBottom;
+                lien = "/series/saisons?id="+serieList[i].id;
+                textBottom = serieList[i].categorie;
+                listStr += "<tr><td>";
+                listStr += "<p style='position: absolute; top: "+(top-20)+"px; left: "+left+"px;'><strong>"+serieList[i].titre+"</strong></p><br/>";
+                listStr += "<a href='"+lien+"'><img src='"+serieList[i].image+"' style='position: absolute; top: "+top+"px; left: "+left+"px; width: 170px; height: 225px;' /></a>";
+                listStr += "<p style='position: absolute; top: "+(top+205)+"px; left: "+((left+170)-textBottom.length*8)+"px; z-index: 2; background-color: #000; color: #fff;'>"+textBottom+"</p>";
+                if (serieList[i].your) {
+                    listStr += "<input onclick='supprSerie("+serieList[i].id+")' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + left + "px' type='button' value='supprimer' />";
+                    listStr += "<input onclick='location.href = `/modif/serie?id=" + serieList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
+                }
+                if (serieList[i].your || (ownPerm === "admin" & serieList[i].permUploader !== "admin")) {
+                    listStr += "<input onclick='supprSerie("+serieList[i].id+")' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + left + "px' type='button' value='supprimer' />";
+                    if (serieList[i].your) {
+                        listStr += "<input onclick='location.href = `/modif/serie?id=" + serieList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
+                    }
+                }
+                listStr += "</td></tr>";
+                left += 230;
+                if (left >= 400+(230*3)) {
+                    listStr += "<br><br><br><br><br><br><br><br><br><br><br><br>";
+                    left = 400;
+                    top += 300;
+                }
+            }
+            listStr += "</table>";
+            $("#displaySerie").html(listStr);
+        }
+
+        function supprSerie(id) {
+            if (!confirm("ATTENTION! La suppression de cette serie entrenera celle de toute les saisons et de tous les episodes.\n Voulez vous continuer?")) {
+                return;
+            }
+            if (!confirm("Êtes vous sûre de vouloir la supprimer ?")) {
+                return;
+            }
+            let formData = new FormData();
+            formData.append('id', id);
+
+            $.ajax({
+                url: 'http://' + window.location.hostname + ':8000/series/deleteSerie',
+                data: formData,
+                type: 'POST',
+                processData: false,
+                dataType: 'json',
+                contentType: false,
+                success: (data) => {
+                    $("#buttons_" + id).css("display", "");
+                    if (data.rep == "success") {
+                        window.location.reload();
+                    } else if (data.rep == "failed") {
+                        let errorStr = "";
+                        for (let i = 0; i < data.errors.length; i++) {
+                            errorStr += data.errors[i] + "\n";
+                        }
+                        alert(errorStr);
+                    }
+                },
+                error: function (xhr, rrr, error) {
+                    alert(error);
+                }
+            });
+        }
+    </script>
+{% endblock %}

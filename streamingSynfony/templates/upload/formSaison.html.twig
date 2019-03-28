@@ -1,0 +1,24 @@
+<h1>Upload saison</h1>
+<table>
+    <tr>
+        <td>nom :</td><td><input type="text" id="nom"/></td>
+    </tr>
+    <tr>
+        <td>l'image: </td><td><input type="file" id="imageSaisonSelect"/></td>
+    </tr>
+    <tr>
+        <td>La série:</td><td>
+            <select id="serie">
+                <option value="">Choisissez</option>
+                {% for serie in series %}
+                    {% if serie.User.id == me.id %}
+                        <option value="{{ serie.id }}">{{ serie.nom }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2"><br/><center><input style="width: 150px;" type="button" value="Valider" onclick="uploadSaison()"/></center></td>
+    </tr>
+</table>

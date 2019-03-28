@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+{% set currentPath = path(app.request.attributes.get('_route'),
+    app.request.attributes.get('_route_params')) %}
+{% set referer = app.request.headers.get('referer')|default('/') %}
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Site de streaming{% endblock %}</title>
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+    <style>
+        surlign {
+            color: orangered;
+            font-weight: bold;
+        }
+        .submenu{
+            display: none;
+            margin:0;
+            padding:0;
+        }
+        nav li:hover .submenu {
+            display: inline-block;
+            margin-left: 17%;
+            list-style-type: none;
+        }
+        .submenuLink {
+            color: #888;
+            text-decoration: none;
+        }
+        .submenuLink:hover {
+            color: #fff;
+            text-decoration: none;
+        }
+    </style>
+    {% block stylesheets %}{% endblock %}
+</head>
+<body>
+<nav class="navbar navbar-inverse">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <a class="navbar-brand" href="{{ path('acceuil') }}">Site de streaming</a>
+        </div>
+        <ul class="nav navbar-nav">
+            {% if currentPath == "/films" %}
+                <li class="active"><a href="{{ path("films") }}">Films</a></li>
+            {% else %}
+                <li><a href="{{ path("films") }}">Films</a></li>
+            {% endif %}
+            {% if currentPath == "/series" %}
+                <li class="active"><a href="{{ path("series") }}">Series</a></li>
+            {% else %}
+                <li><a href="{{ path("series") }}">Series</a></li>
+            {% endif %}
+        </ul>
+        <ul class="nav navbar-nav navbar-right">
+            {% if app.user %}
+                {% if me.perm == "uploader" %}
+                    {% if currentPath == "/upload" %}
+                        <li class="active">
+                    {% else %}
+                        <li>
+                    {% endif %}
+                    <a href="{{ path("upload") }}"><span class="glyphicon glyphicon-user"></span>Upload</a></li>
+                {% endif %}
+                {% if me.perm == "moderateur" or me.perm == "admin" %}
+                    {% if currentPath == "/admin/userList" %}
+                        <li class="active">
+                    {% else %}
+                        <li>
+                    {% endif %}
+                    <a href="{{ path("adminUserList") }}"><span class="glyphicon glyphicon-user"></span>Administration</a></li>
+                {% endif %}
+                {% if currentPath == "/compte/voir" %}
+                    <li class="active">
+                {% else %}
+                    <li>
+                {% endif %}
+                <a href="{{ path("voirCompte") }}"><span class="glyphicon glyphicon-user"></span>Mon compte</a>
+                <!--<ul class="submenu">
+                    <li>
+                        <a class="submenuLink" href="#">Mes métrages</a>
+                    </li>
+                </ul>-->
+                </li>
+                {% if currentPath == "/logoutDemand" %}
+                    <li class="active"><a href="{{ path("logoutDemand") }}"><span class="glyphicon glyphicon-user"></span>Deconnexion</a></li>
+                {% else %}
+                    <li><a href="{{ path("logoutDemand") }}"><span class="glyphicon glyphicon-user"></span>Deconnexion</a></li>
+                {% endif %}
+                <li style="color: #fff;">
+                    {{ me.prenom }}<br/>
+                    {{ me.nom }}<br/>
+                </li>
+            {% else %}
+                {% if currentPath == "/login" %}
+                    <li class="active"><a href="{{ path("login") }}"><span class="glyphicon glyphicon-user"></span>Connexion</a></li>
+                {% else %}
+                    <li><a href="{{ path("login") }}"><span class="glyphicon glyphicon-user"></span>Connexion</a></li>
+                {% endif %}
+                {% if currentPath == "/register" %}
+                    <li class="active"><a href="{{ path("register") }}"><span class="glyphicon glyphicon-user"></span>Inscription</a></li>
+                {% else %}
+                    <li><a href="{{ path("register") }}"><span class="glyphicon glyphicon-user"></span>Inscription</a></li>
+                {% endif %}
+            {% endif %}
+        </ul>
+    </div>
+</nav>
+<div class="container body">
+    <center>
+    {% block body %}{% endblock %}
+    </center>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+<script>
+    {% if app.user %}
+        const ownPerm = "{{ me.perm }}";
+    {% else %}
+        const ownPerm = "anonymous";
+    {% endif %}
+    function remplace(str,A,B) {
+        while(str.replace(A,B) != str){
+            str = str.replace(A,B);
+        }
+        return str;
+    }
+
+    function toMin(word) {
+        const maj = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
+        const min = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"];
+        for (let i=0;i<maj.length;i++) {
+            word = remplace(word,maj[i],min[i]);
+        }
+        return word;
+    }
+</script>
+{% block javascripts %}{% endblock %}
+</body>
+</html>
