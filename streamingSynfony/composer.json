@@ -21,7 +21,7 @@
         "symfony/validator": "4.2.*",
         "symfony/web-server-bundle": "4.2.*",
         "symfony/yaml": "4.2.*",
-	"symfony/dependency-injection": "4.2.7"
+	"symfony/dependency-injection": "4.2.12"
     },
     "config": {
         "preferred-install": {
