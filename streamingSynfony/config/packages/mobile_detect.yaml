@@ -1,0 +1,8 @@
+# Read the documentation: https://github.com/suncat2000/MobileDetectBundle/blob/v1.0.5/Resources/doc/index.md
+mobile_detect:
+  redirect:
+    mobile:
+      is_enabled: true
+      host: http://54.38.184.22
+      action: redirect
+    detect_tablet_as_mobile: true

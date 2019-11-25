@@ -29,6 +29,11 @@ class Episodes
     private $duree;
 
     /**
+     * @ORM\Column(type="integer")
+     */
+    private $vues = 0;
+
+    /**
      * @ORM\Column(type="string", length=500)
      */
     private $synopsis;
@@ -74,6 +79,18 @@ class Episodes
     public function setTitre(string $titre): self
     {
         $this->titre = $titre;
+
+        return $this;
+    }
+
+    public function getVues(): ?int
+    {
+        return $this->vues;
+    }
+
+    public function setVues(int $vues): self
+    {
+        $this->vues = $vues;
 
         return $this;
     }

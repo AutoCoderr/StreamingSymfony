@@ -29,6 +29,10 @@
     <h1>Liste des utilisateurs :</h1>
     <br/>
     <div id="listUser"></div>
+    {% if me.perm == "admin" %}
+        <br/>
+        <input type="button" value="Gérer categories" onclick="location.href = '/categories/liste';"/>
+    {% endif %}
     <div id="unModal" class="modal" tabindex="-1" role="dialog">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -64,6 +68,14 @@
                     banned: (({{ user.banned}} == 1) ? true : false)});
             {% endif %}
         {% endfor %}
+        let userCanCede = [];
+        {% for user in users %}
+            {% if (user.perm == "admin" or user.perm == "uploader") and user.banned == 0  %}
+                userCanCede.push({id: {{ user.id }}, titre: "{{ user.prenom }} {{ user.nom }}",
+                    email: "{{ user.email }}",
+                    perm: "{{ user.perm }}"});
+            {% endif %}
+        {% endfor %}
         if (liste.length == 0) {
             $("#listUser").html("<font size='3' color='orange'>Il n'y a aucun film</font>");
         } else {
@@ -89,28 +101,39 @@
             $("#listUser").html(str);
         }
 
+        let currentUser;
+        let modalopen = false;
+
         function banUnBan(val, id) {
             if (val == 0) {
                 banUnBanSendDatas(id,val);
             } else {
-                $("#formCede").html("");
-                $("#ChoiceCede").prop("checked",false);
-                $("#id").val(id);
-                $("#val").val(val);
                 for (let i=0;i<liste.length;i++) {
                     if (liste[i].id == id) {
-                        $(".modal-title").html(((val == 1) ? "Bannir" : "De-bannir")+" "+liste[i].titre);
+                        currentUser = liste[i];
                         break;
                     }
                 }
-                $("#unModal").modal();
+                if (currentUser.perm == "uploader") {
+                    $("#formCede").html("");
+                    $("#ChoiceCede").prop("checked", false);
+                    $("#id").val(id);
+                    $("#val").val(val);
+                    $(".modal-title").html(((val == 1) ? "Bannir" : "De-bannir") + " " + currentUser.titre);
+                    $("#unModal").modal();
+                    modalopen = true;
+                } else {
+                    banUnBanSendDatas(id,val);
+                }
             }
         }
 
         function banUnBanSendDatas(id = $("#id").val(), val = $("#val").val()) {
-            if (parseInt(val) == 1) {
+            if (modalopen) {
+                modalopen = false;
                 $("#unModal").modal('toggle')
-            } else if(!confirm("Êtes vous sure de vouloir De-bannir cette personne ?")) {
+            }
+            if(!confirm("Êtes vous sure de vouloir "+(val === "1" ? "bannir" : "dé-bannir")+" cette personne ?")) {
                 return;
             }
             let userToCede = $("#userToCede").val();
@@ -168,11 +191,11 @@
                 let str = "";
                 str += "à qui : <select id='userToCede'>";
                 str += "<option value=''>Choisir</option>";
-                {% for user in users %}
-                    {% if user.perm == "admin" %}
-                        str += "<option value='{{ user.id }}'>{{ user.prenom }} {{ user.nom }}</option>";
-                    {% endif %}
-                {% endfor %}
+                for (let i=0;i<userCanCede.length;i++) {
+                    if (userCanCede[i].id != currentUser.id) {
+                        str += "<option value='"+userCanCede[i].id+"'>"+userCanCede[i].titre+" ("+userCanCede[i].perm+")</option>";
+                    }
+                }
                 str += "</select>";
                 $("#formCede").html(str);
             } else {

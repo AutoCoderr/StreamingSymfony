@@ -1,0 +1,83 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}modifier {{ serie.nom }}{% endblock %}
+
+{% block body %}
+    <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
+    <br/>
+    <h1>Modifier {{ serie.nom }}</h1>
+    <br/>
+    <br/>
+    <table>
+        <tr>
+            <td>Changer le propriétaire</td><td>
+                <select id="proprio" onchange="proprioChanged()">
+                    {% if me.perm == "admin" %}
+                        <option value="{{ me.id }}">{{ me.prenom }} {{ me.nom }}</option>
+                    {% endif %}
+                    {% for user in users %}
+                        {% if user.perm == "uploader" %}
+                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                <span id="allChildren" style="display: none;">Toute ses saisons et episodes<input type="checkbox"></span>
+            </td>
+        </tr>
+    </table>
+    <div id="msg"></div>
+    <br/>
+    <input type="button" value="Appliquer" onclick="modifSerie()"/>
+{% endblock %}
+{% block javascripts %}
+<script>
+    $("#proprio").val("{{ me.id }}");
+
+    function modifSerie() {
+        const idProprio = $("#proprio").val();
+        const allChildren = $($("#allChildren > input")[0]).prop("checked");
+
+        let formData = new FormData();
+        formData.append("id", {{ serie.id }});
+        formData.append('idProprio', idProprio);
+        formData.append('allChildren', allChildren);
+        $.ajax({
+            url: 'http://'+window.location.hostname+':8000/modif/applySerie',
+            data: formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            enctype: 'multipart/form-data',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "success") {
+                    location.href = "{{ referer }}";
+                } else if (data.rep == "failed") {
+                    $("#msg").empty();
+                    let errorStr = "<ul>";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                    }
+                    errorStr += "</ul>";
+                    $("#msg").append(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+
+    }
+
+    function proprioChanged() {
+        if ($("#proprio").val() == "{{ me.id }}") {
+            $("#allChildren").css("display", "none");
+            return;
+        }
+        $("#allChildren").css("display", "");
+    }
+
+</script>
+{% endblock %}

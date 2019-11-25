@@ -1,0 +1,209 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Gestion categories{% endblock %}
+
+{% block body %}
+    <input type="button" value="<=" onclick="location.href = '/admin/userList';"/>
+    <br/>
+    Filtres :
+    <br/>
+    <table style="border-spacing: 5px; border-collapse: separate;">
+        <tr>
+            <td>
+                Par nom :<input type="text" id="filtreNom" />
+            </td>
+            <td>
+                Trier : <select id="filtreTrie">
+                    <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                    <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align: center;" colspan="2">
+                <input type="button" value="Appliquer" onclick="filtre()"/>
+            </td>
+        </tr>
+    </table>
+    <h1>Liste des categories :</h1>
+    <br/>
+    <br/>
+    <div id="msg"></div>
+    <div id="displayCategories"></div>
+    <br/>
+    <input type="button" value="Ajouter" onclick="newCategorie()"/>
+    <div id="formNew"></div>
+{% endblock %}
+{% block javascripts %}
+    {% include 'filtres/javascript.twig' %}
+    <script>
+        let liste = [];
+
+        {% for categorie in categories %}
+            liste.push({id : {{ categorie.id}}, titre: "{{ categorie.nom }}"});
+        {% endfor %}
+
+        if (liste.length == 0) {
+            $("#displayCategories").html("<font size='3' color='orange'>Il n'y a aucune categorie</font>");
+        } else {
+            liste = trieAlphabetique("croissant", liste);
+            display(liste);
+        }
+
+        function display(listeCategorie) {
+            let str = "<table>";
+            for (let i=0;i<listeCategorie.length;i++) {
+                str += "<tr>";
+                str += "<td id='categorie_"+listeCategorie[i].id+"'>"+listeCategorie[i].titre+" </td>";
+                str += "<td id='renameTd_"+listeCategorie[i].id+"'><input type='button' value='Renommer' onclick='renameCategorie("+listeCategorie[i].id+")'/></td>";
+                str += "<td id='supprTd_"+listeCategorie[i].id+"'><input type='button' value='Supprimer' onclick='supprCategorie("+listeCategorie[i].id+")'/></td>";
+                str += "</tr>";
+            }
+            str += "</table>";
+            $("#displayCategories").html(str);
+        }
+
+        function supprCategorie(id) {
+            for (let i=0;i<liste.length;i++) {
+                $("#formSuppr_"+liste[i].id).remove();
+            }
+
+            let str = "<span id='formSuppr_"+id+"'>";
+            str += "Quelle categorie mettre aux métrages de cette categorie? : ";
+            str += "<select id='CategorieToReplace_"+id+"'>";
+            for (let i=0;i<liste.length;i++) {
+                if (liste[i].id != id) {
+                    str += "<option value='" + liste[i].id + "'>" + liste[i].titre + "</option>";
+                }
+            }
+            str += "</select><input type='button' value='OK' onclick='applySuppr("+id+")'/></span>";
+            $("#supprTd_"+id).append(str);
+        }
+
+        function applySuppr(id) {
+            const idCategorieToReplace = $("#CategorieToReplace_"+id).val();
+            $("#formSuppr_"+id).remove();
+
+            let formData = new FormData();
+            formData.append("id", id);
+            formData.append('idCategorieToReplace', idCategorieToReplace);
+            $.ajax({
+                url: 'http://'+window.location.hostname+':8000/categorie/suppr',
+                data: formData,
+                type:'POST',
+                processData: false,
+                dataType: 'json',
+                enctype: 'multipart/form-data',
+                contentType: false,
+                success: (data) =>
+                {
+                    if (data.rep == "success") {
+                        window.location.reload();
+                    } else if (data.rep == "failed") {
+                        $("#msg").empty();
+                        let errorStr = "<ul>";
+                        for (let i=0;i<data.errors.length;i++) {
+                            errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                        }
+                        errorStr += "</ul>";
+                        $("#msg").append(errorStr);
+                    }
+                },
+                error:function(xhr,rrr,error)
+                {
+                    alert(error);
+                }
+            });
+        }
+
+        function renameCategorie(id) {
+            for (let i=0;i<liste.length;i++) {
+                $("#formRename_"+liste[i].id).remove();
+            }
+            $("#renameTd_"+id).append("<div id='formRename_"+id+"'>nom : <input type='text' id='newName_"+id+"'/><input onclick='applyRename("+id+")' type='button' value='OK' /></div>");
+            for (let i=0;i<liste.length;i++) {
+                if (liste[i].id === id) {
+                    $("#newName_"+id).val(liste[i].titre);
+                    break;
+                }
+            }
+        }
+
+        function applyRename(id) {
+            const newName = $("#newName_"+id).val();
+            $("#formRename_"+id).remove();
+
+            let formData = new FormData();
+            formData.append("id", id);
+            formData.append('newName', newName);
+            $.ajax({
+                url: 'http://'+window.location.hostname+':8000/categorie/rename',
+                data: formData,
+                type:'POST',
+                processData: false,
+                dataType: 'json',
+                enctype: 'multipart/form-data',
+                contentType: false,
+                success: (data) =>
+                {
+                    if (data.rep == "success") {
+                        $("#msg").empty();
+                        $("#categorie_"+id).html(newName);
+                    } else if (data.rep == "failed") {
+                        $("#msg").empty();
+                        let errorStr = "<ul>";
+                        for (let i=0;i<data.errors.length;i++) {
+                            errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                        }
+                        errorStr += "</ul>";
+                        $("#msg").append(errorStr);
+                    }
+                },
+                error:function(xhr,rrr,error)
+                {
+                    alert(error);
+                }
+            });
+        }
+
+        function newCategorie(){
+            if ($("#formNew").html().length == 0) {
+                $("#formNew").html("Son nom : <input type='text' id='nameCat'/><input type='button' value='OK' onclick='applyAdd()'/>");
+            }
+        }
+
+        function applyAdd() {
+            const name =  $("#nameCat").val();
+            let formData = new FormData();
+            formData.append('name', name);
+            $.ajax({
+                url: 'http://'+window.location.hostname+':8000/categorie/add',
+                data: formData,
+                type:'POST',
+                processData: false,
+                dataType: 'json',
+                enctype: 'multipart/form-data',
+                contentType: false,
+                success: (data) =>
+                {
+                    if (data.rep == "success") {
+                       window.location.reload();
+                    } else if (data.rep == "failed") {
+                        $("#msg").empty();
+                        let errorStr = "<ul>";
+                        for (let i=0;i<data.errors.length;i++) {
+                            errorStr += "<li><font size='3' color='red'>"+data.errors[i]+"</font></li>";
+                        }
+                        errorStr += "</ul>";
+                        $("#msg").append(errorStr);
+                    }
+                },
+                error:function(xhr,rrr,error)
+                {
+                    alert(error);
+                }
+            });
+        }
+
+    </script>
+{% endblock %}

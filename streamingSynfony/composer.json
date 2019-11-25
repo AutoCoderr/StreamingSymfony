@@ -6,6 +6,7 @@
         "ext-ctype": "*",
         "ext-iconv": "*",
         "ext-json": "^1.6",
+        "suncat/mobile-detect-bundle": "^1.1",
         "symfony/console": "4.2.*",
         "symfony/debug": "4.2.*",
         "symfony/dotenv": "4.2.*",

@@ -21,7 +21,7 @@ class SaisonsRepository extends ServiceEntityRepository
 
     public function findAll() {
         return $this->createQueryBuilder('s')
-            ->orderBy('s.nom', 'ASC')
+            ->orderBy('s.nom', 'DESC')
             ->getQuery()
             ->getResult()
             ;

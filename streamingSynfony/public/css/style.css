@@ -1,0 +1,22 @@
+surlign {
+    color: orangered;
+    font-weight: bold;
+}
+.submenu{
+    display: none;
+    margin:0;
+    padding:0;
+}
+nav li:hover .submenu {
+    display: inline-block;
+    margin-left: 17%;
+    list-style-type: none;
+}
+.submenuLink {
+    color: #888;
+    text-decoration: none;
+}
+.submenuLink:hover {
+    color: #fff;
+    text-decoration: none;
+}

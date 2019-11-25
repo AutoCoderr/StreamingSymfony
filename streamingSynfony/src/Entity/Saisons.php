@@ -31,6 +31,7 @@ class Saisons
     /**
      * @ORM\ManyToOne(targetEntity="App\Entity\Series", inversedBy="saisons")
      * @ORM\JoinColumn(nullable=false)
+     * @ORM\OrderBy({"nom" = "ASC"})
      */
     private $serie;
 

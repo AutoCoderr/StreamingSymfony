@@ -3,7 +3,7 @@
 {% block title %}{{ saga.nom }}- Site de streaming{% endblock %}
 
 {% block body %}
-    {% if referer|slice(24,11) == "/films/view" %}
+    {% if referer|slice(24,11) == "/films/view" or referer|slice(24,11) == "/modif/film" %}
         <input type="button" value="<=" onclick="location.href = '/films'"/>
     {% else %}
         <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
@@ -11,34 +11,44 @@
     <br/>
     Filtres :
     <br/>
-    <table style="border-spacing: 5px; border-collapse: separate;">
-        <tr>
-            <td>
-                Par nom :<input type="text" id="filtreNom" />
-            </td>
-            <td>
-                Par Uploader :<select id="filtreUploader">
-                    <option value="">Tous</option>
-                    {% for user in users %}
-                        {% if user.perm == "uploader" or user.perm == "admin" %}
-                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </td>
+    {% if is_mobile() %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+                <td style="text-align: center;" rowspan="3">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
             <td>
                 Trier : <select id="filtreTrie">
                     <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
                     <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
                 </select>
             </td>
-        </tr>
-        <tr>
-            <td style="text-align: center;" colspan="3">
-                <input type="button" value="Appliquer" onclick="filtre()"/>
-            </td>
-        </tr>
-    </table>
+            </tr>
+        </table>
+    {% else %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+                <td>
+                    Trier : <select id="filtreTrie">
+                        <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                        <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td style="text-align: center;" colspan="5">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
+        </table>
+    {% endif %}
     <h1>{{ saga.nom }} ({{ saga.categorie.nom }}) : </h1>
     <br/>
     <div id="displayFilm"></div>
@@ -46,6 +56,7 @@
 {% block javascripts %}
     {% include 'filtres/javascript.twig' %}
     <script>
+        const isMobile = (screen.width < screen.height);
         let liste = [];
         {% for film in saga.films %}
             liste.push({
@@ -77,14 +88,19 @@
                 $("#displayFilm").html("<font size='3' color='orange'>Aucun film trouvé</font>")
                 return;
             }
-            let top = 260;
-            let left = 400;
-            let listStr = "<br><br><br><br><br><br><br><br><br><br><br><br><br><br>";
-            listStr += "<table>";
+            let top;
+            let left;
+            if (!isMobile) {
+                top = 290;
+                left = screen.width*0.2;
+            } else {
+                top = 330;
+                left = screen.width*0.45;
+            }
+            let listStr = "<br><br><br><br><br><br><br><br><br><br>";
             for (let i=0;i<filmList.length;i++) {
                 const lien = "/films/view?id="+filmList[i].id;
                 const textBottom = filmList[i].duree;
-                listStr += "<tr><td>";
                 listStr += "<p style='position: absolute; top: "+(top-20)+"px; left: "+left+"px;'><strong>"+filmList[i].titre+"</strong></p><br/>";
                 listStr += "<a href='"+lien+"'><img src='"+filmList[i].image+"' style='position: absolute; top: "+top+"px; left: "+left+"px; width: 170px; height: 225px;' /></a>";
                 listStr += "<p style='position: absolute; top: "+(top+205)+"px; left: "+(left+135)+"px; z-index: 2; background-color: #000; color: #fff;'>"+textBottom+"</p>";
@@ -94,15 +110,18 @@
                         listStr += "<input onclick='location.href = `/modif/film?id=" + filmList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
                     }
                 }
-                listStr += "</td></tr>";
-                left += 230;
-                if (left >= 400+(230*3)) {
-                    listStr += "<br><br><br><br><br><br><br><br><br><br><br><br>";
-                    left = 400;
+                if (!isMobile) {
+                    left += 350;
+                    if (left >= 300 + (350 * 3)) {
+                        listStr += "<br><br><br><br><br><br><br><br>";
+                        left = 300;
+                        top += 300;
+                    }
+                } else {
                     top += 300;
+                    listStr += "<br><br><br><br><br><br><br><br>";
                 }
             }
-            listStr += "</table>";
             $("#displayFilm").html(listStr);
         }
 

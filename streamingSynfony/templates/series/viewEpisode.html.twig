@@ -103,17 +103,13 @@
         let nom = "{{ me.nom }}";
     {% endif %}
     let contentComment = "";
-
     $("#bt_1").click();
-
     /*$("#displayIframe").onclick(() => {
         alert("wesh");
     })*/
-
     function displayLien(lien) {
         $("#displayLien").html("<iframe allowfullscreen='true' style='width: 800px; height: 450px;' src='"+lien+"' ></iframe>");
     }
-
     function editForm(id) {
         $("#buttons_"+id).css("display", "none");
         contentComment = $("#content_"+id).html();
@@ -123,12 +119,10 @@
         $("#content_"+id).html("<textarea style='width: 417px; height: 96px;' >"+remplace(contentComment,"<br>","\n")+"</textarea><br/><input type='button' value='Valider' onclick='edit("+id+")'/>"+
         "<input type='button' value='Annuler' onclick='editAnnule("+id+")'/>");
     }
-
     function editAnnule(id) {
         $("#buttons_"+id).css("display", "");
         $("#content_"+id).html(contentComment);
     }
-
     function areSpace(id) {
         const content = $("#content_"+id).html();
         if (remplace(content.substring(0,33)," ","").length == 1 & remplace(content.substring(content.length-29,content.length)," ","").length == 1 &
@@ -137,13 +131,11 @@
         }
         return false;
     }
-
     function edit(id) {
         const content = $("#content_"+id+" > textarea").val();
         let formData = new FormData();
         formData.append('content', content);
         formData.append('id', id);
-
         $.ajax({
             url:'http://'+window.location.hostname+':8000/commentaires/edit',
             data:formData,
@@ -173,7 +165,6 @@
             }
         });
     }
-
     function sendCommentaire() {
         const commentaire = $("#commentaire").val();
         let formData = new FormData();
@@ -251,11 +242,9 @@
             }
         });
     }
-
     function supprCommentaire(id) {
         let formData = new FormData();
         formData.append('id', id);
-
         $.ajax({
             url:'http://'+window.location.hostname+':8000/commentaires/suppr',
             data:formData,

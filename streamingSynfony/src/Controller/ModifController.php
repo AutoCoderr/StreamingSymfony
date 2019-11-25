@@ -52,13 +52,22 @@ class ModifController extends AbstractController
         }
         $saisonRepository = $em->getRepository(Saisons::class);
         $userRepository = $em->getRepository(Users::class);
-        return $this->render('modif/modifEpisode.html.twig', [
-            'controller_name' => "ModifController",
-            'me'      => $this->getUser(),
-            'episode'    => $episode,
-            'users'        => $userRepository->findAll(),
-            'saisons'       => $saisonRepository->findBySerieId($episode->getSaison()->getSerie()->getId())
-        ]);
+        if ($this->getUser()->getPerm() == "uploader") {
+            return $this->render('modif/modifEpisode.html.twig', [
+                'controller_name' => "ModifController",
+                'me' => $this->getUser(),
+                'episode' => $episode,
+                'users' => $userRepository->findAll(),
+                'saisons' => $saisonRepository->findBySerieId($episode->getSaison()->getSerie()->getId())
+            ]);
+        } else {
+            return $this->render('modif/modifEpisodeOnlyProprio.html.twig', [
+                'controller_name' => "ModifController",
+                'me' => $this->getUser(),
+                'episode' => $episode,
+                'users' => $userRepository->findAll(),
+            ]);
+        }
     }
 
     /**
@@ -98,35 +107,38 @@ class ModifController extends AbstractController
         }
 
         $errors = [];
-        $urls = explode(",",$request->request->get("URLs"));
-        if (sizeof($urls) == 0) {
-            $errors[] = "Aucune URL spécifiée";
-        }
         $idProprio = $request->request->get("idProprio");
         if ($idProprio == "" | $idProprio == null) {
             $errors[] = "Proprietaire non renseigné";
         }
-        $idSaison = $request->request->get("idSaison");
-        if ($idSaison == "" | $idSaison == null) {
-            $errors[] = "Saison non spécifiée";
-        }
-        $titre = $request->request->get("titre");
-        if ($titre == "" | $titre == null) {
-            $errors[] = "Titre non renseigné";
-        }
-        if (strlen($titre) > 50) {
-            $errors[] = "Le titre ne doit pas faire plus de 50 caractères";
-        }
-        $duree = $request->request->get("duree");
-        if ($duree == "" | $duree == null) {
-            $errors[] = "Durée non renseigné";
-        }
-        $synopsis = $request->request->get("synopsis");
-        if ($synopsis == "" | $synopsis == null) {
-            $errors[] = "Synopsis non renseigné";
-        }
-        if (strlen($synopsis) > 500) {
-            $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
+        if ($this->getUser()->getPerm() == "uploader") {
+            $urls = explode(",", $request->request->get("URLs"));
+            if (sizeof($urls) == 0) {
+                $errors[] = "Aucune URL spécifiée";
+            }
+            $idSaison = $request->request->get("idSaison");
+            if ($idSaison == "" | $idSaison == null) {
+                $errors[] = "Saison non spécifiée";
+            }
+            $titre = $request->request->get("titre");
+            if ($titre == "" | $titre == null) {
+                $errors[] = "Titre non renseigné";
+            }
+            if (strlen($titre) > 50) {
+                $errors[] = "Le titre ne doit pas faire plus de 50 caractères";
+            }
+            $duree = $request->request->get("duree");
+            if ($duree == "" | $duree == null) {
+                $errors[] = "Durée non renseigné";
+            }
+            $synopsis = $request->request->get("synopsis");
+            if ($synopsis == "" | $synopsis == null) {
+                $errors[] = "Synopsis non renseigné";
+            }
+
+            if (strlen($synopsis) > 500) {
+                $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
+            }
         }
 
         if (sizeof($errors) > 0) {
@@ -146,7 +158,7 @@ class ModifController extends AbstractController
                 }
                 $user = $user[0];
                 if ($user->getPerm() != "uploader") {
-                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["La personne à qui vous souhaitez donner ce film<br/>n'est pas 'uploader'"]]));
+                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["La personne à qui vous souhaitez donner cet episode<br/>n'est pas 'uploader'"]]));
                     $response->headers->set('Content-Type', 'application/json');
 
                     return $response;
@@ -154,38 +166,40 @@ class ModifController extends AbstractController
             }
 
 
-            $saisonRepository = $em->getRepository(Saisons::class);
-            $saison = $saisonRepository->findById($idSaison);
-            if (gettype($saison) == "array" & sizeof($saison) == 0) {
-                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Saison non existante"]]));
-                $response->headers->set('Content-Type', 'application/json');
-                return $response;
-            }
-            $saison = $saison[0];
-            if ($saison->getUser()->getId() != $this->getUser()->getId() &
-                $saison->getId() != $episode->getSaison()->getId()) {
-                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Cette saison ne vous appartiens pas"]]));
-                $response->headers->set('Content-Type', 'application/json');
-                return $response;
-            }
-
-            $episode->setTitre($titre);
             if ($idProprio != $this->getUser()->getId()) {
                 $episode->setUser($user);
             }
-            $episode->setDuree(new \DateTime($duree));
-            $episode->setSynopsis($synopsis);
-            $episode->setSaison($saison);
-            $urlRepository = $em->getRepository(URLs::class);
-            $urlsOrigin = $urlRepository->findByEpisodeId($id);
-            foreach ($urlsOrigin as $url) {
-                $em->remove($url);
-            }
-            foreach ($urls as $url) {
-                $urlObject = new URLs();
-                $urlObject->setLien($url);
-                $urlObject->setEpisode($episode);
-                $em->persist($urlObject);
+            if ($this->getUser()->getPerm() == "uploader") {
+                $saisonRepository = $em->getRepository(Saisons::class);
+                $saison = $saisonRepository->findById($idSaison);
+                if (gettype($saison) == "array" & sizeof($saison) == 0) {
+                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Saison non existante"]]));
+                    $response->headers->set('Content-Type', 'application/json');
+                    return $response;
+                }
+                $saison = $saison[0];
+                if ($saison->getUser()->getId() != $this->getUser()->getId() &
+                    $saison->getId() != $episode->getSaison()->getId()) {
+                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Cette saison ne vous appartiens pas"]]));
+                    $response->headers->set('Content-Type', 'application/json');
+                    return $response;
+                }
+
+                $episode->setTitre($titre);
+                $episode->setDuree(new \DateTime($duree));
+                $episode->setSynopsis($synopsis);
+                $episode->setSaison($saison);
+                $urlRepository = $em->getRepository(URLs::class);
+                $urlsOrigin = $urlRepository->findByEpisodeId($id);
+                foreach ($urlsOrigin as $url) {
+                    $em->remove($url);
+                }
+                foreach ($urls as $url) {
+                    $urlObject = new URLs();
+                    $urlObject->setLien($url);
+                    $urlObject->setEpisode($episode);
+                    $em->persist($urlObject);
+                }
             }
 
             $em->persist($episode);
@@ -232,13 +246,22 @@ class ModifController extends AbstractController
         }
         $serieRepository = $em->getRepository(Series::class);
         $userRepository = $em->getRepository(Users::class);
-        return $this->render('modif/modifSaison.html.twig', [
-            'controller_name' => "ModifController",
-            'me'      => $this->getUser(),
-            'saison'    => $saison,
-            'users'        => $userRepository->findAll(),
-            'series'       => $serieRepository->findAll()
-        ]);
+        if ($this->getUser()->getPerm() == "uploader") {
+            return $this->render('modif/modifSaison.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'saison'    => $saison,
+                'users'        => $userRepository->findAll(),
+                'series'       => $serieRepository->findAll()
+            ]);
+        } else {
+            return $this->render('modif/modifSaisonOnlyProprio.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'saison'    => $saison,
+                'users'        => $userRepository->findAll(),
+            ]);
+        }
     }
 
     /**
@@ -277,24 +300,27 @@ class ModifController extends AbstractController
         }
 
         $errors = array();
-        $nom = $request->request->get("nom");
-        if ($nom == "" | $nom == null) {
-            $errors[] = "Nom non renseigné";
-        }
-        if (strlen($nom) > 50) {
-            $errors[] = "Le nom ne doit pas faire plus de 50 caractères";
-        }
-        $idProprio = $request->request->get("idProprio");
-        if ($idProprio == "" | $idProprio == null) {
-            $errors[] = "Proprietaire non renseigné";
+
+        if ($this->getUser()->getPerm() == "uploader") {
+            $nom = $request->request->get("nom");
+            if ($nom == "" | $nom == null) {
+                $errors[] = "Nom non renseigné";
+            }
+            if (strlen($nom) > 50) {
+                $errors[] = "Le nom ne doit pas faire plus de 50 caractères";
+            }
+            $idSerie = $request->request->get("idSerie");
+            if ($idSerie == "" | $idSerie == null) {
+                $errors[] = "Serie non renseigné";
+            }
         }
         $allChildren = $request->request->get("allChildren");
         if ($allChildren == "" | $allChildren == null) {
             $errors[] = "Variable boolenne de la case à cocher non spécifiée";
         }
-        $idSerie = $request->request->get("idSerie");
-        if ($idSerie == "" | $idSerie == null) {
-            $errors[] = "Serie non renseigné";
+        $idProprio = $request->request->get("idProprio");
+        if ($idProprio == "" | $idProprio == null) {
+            $errors[] = "Proprietaire non renseigné";
         }
 
         if (sizeof($errors) > 0) {
@@ -320,9 +346,7 @@ class ModifController extends AbstractController
 
                     return $response;
                 }
-            }
 
-            if ($idProprio != $this->getUser()->getId()) {
                 $saison->setUser($user);
                 if ($allChildren == "true") {
                     $episodeRepository = $em->getRepository(Episodes::class);
@@ -336,44 +360,46 @@ class ModifController extends AbstractController
                 }
             }
 
-            $serieRepository = $em->getRepository(Series::class);
-            $serie = $serieRepository->findById($idSerie);
-            if (gettype($serie) == "array" & sizeof($serie) == 0) {
-                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Serie non existante"]]));
-                $response->headers->set('Content-Type', 'application/json');
+            if ($this->getUser()->getPerm() == "uploader") {
+                $serieRepository = $em->getRepository(Series::class);
+                $serie = $serieRepository->findById($idSerie);
+                if (gettype($serie) == "array" & sizeof($serie) == 0) {
+                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Serie non existante"]]));
+                    $response->headers->set('Content-Type', 'application/json');
 
-                return $response;
-            }
-            $serie = $serie[0];
-            if ($serie->getUser()->getId() != $this->getUser()->getId() &
-                $serie->getId() != $saison->getSerie()->getId()) {
-                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Cette serie ne vous appartiens pas"]]));
-                $response->headers->set('Content-Type', 'application/json');
-
-                return $response;
-            }
-
-            $saison->setNom($nom);
-            $saison->setSerie($serie);
-            $image = $request->files->get('image');
-
-            if ($image != null) {
-                $image = $image->getPathName();
-                if (explode("/" , mime_content_type($image))[0] != "image") {
-                    $errors[] = "Ce fichier n'est pas une image";
-                    unlink($image);
+                    return $response;
                 }
-                $ext = ".".explode("/" , mime_content_type($image))[1];
-                $n = random_int(1, 10**15);
-                $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/sagas/";
-                while(file_exists($destination.$n.$ext)) {
-                    $n = random_int(1, 10**15);
+                $serie = $serie[0];
+                if ($serie->getUser()->getId() != $this->getUser()->getId() &
+                    $serie->getId() != $saison->getSerie()->getId()) {
+                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Cette serie ne vous appartiens pas"]]));
+                    $response->headers->set('Content-Type', 'application/json');
+
+                    return $response;
                 }
-                $destination = $destination.$n.$ext;
-                move_uploaded_file ( $image , $destination);
-                $oldImage = $saison->getImage();
-                $saison->setImage("/imgs/sagas/".$n.$ext);
-                unlink ("/root/projects/streamingWebSite/streamingSynfony/public".$oldImage);
+
+                $saison->setNom($nom);
+                $saison->setSerie($serie);
+                $image = $request->files->get('image');
+
+                if ($image != null) {
+                    $image = $image->getPathName();
+                    if (explode("/", mime_content_type($image))[0] != "image") {
+                        $errors[] = "Ce fichier n'est pas une image";
+                        unlink($image);
+                    }
+                    $ext = "." . explode("/", mime_content_type($image))[1];
+                    $n = random_int(1, 10 ** 15);
+                    $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/sagas/";
+                    while (file_exists($destination . $n . $ext)) {
+                        $n = random_int(1, 10 ** 15);
+                    }
+                    $destination = $destination . $n . $ext;
+                    move_uploaded_file($image, $destination);
+                    $oldImage = $saison->getImage();
+                    $saison->setImage("/imgs/sagas/" . $n . $ext);
+                    unlink("/root/projects/streamingWebSite/streamingSynfony/public" . $oldImage);
+                }
             }
 
             $em->persist($saison);
@@ -420,13 +446,23 @@ class ModifController extends AbstractController
         }
         $userRepository = $em->getRepository(Users::class);
         $categorieRepository = $em->getRepository(Categories::class);
-        return $this->render('modif/modifSerie.html.twig', [
-            'controller_name' => "ModifController",
-            'me'      => $this->getUser(),
-            'serie'    => $serie,
-            'categories'   => $categorieRepository->findAll(),
-            'users'        => $userRepository->findAll()
-        ]);
+        if ($this->getUser()->getPerm() == "uploader") {
+            return $this->render('modif/modifSerie.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'serie'    => $serie,
+                'categories'   => $categorieRepository->findAll(),
+                'users'        => $userRepository->findAll()
+            ]);
+        } else {
+            return $this->render('modif/modifSerieOnlyProprio.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'serie'    => $serie,
+                'users'        => $userRepository->findAll()
+            ]);
+        }
+
     }
 
     /**
@@ -465,13 +501,42 @@ class ModifController extends AbstractController
         }
 
         $errors = array();
+
         $nom = $request->request->get("nom");
-        if ($nom == "" | $nom == null) {
-            $errors[] = "Nom non renseigné";
+        if ($this->getUser()->getPerm() == "uploader") {
+            if ($nom == "" | $nom == null) {
+                $errors[] = "Nom non renseigné";
+            }
+            if (strlen($nom) > 20) {
+                $errors[] = "Le nom ne doit pas faire plus de 20 caractères";
+            }
+            $idCategorie = $request->request->get("idCategorie");
+            if ($idCategorie == "" | $idCategorie == null) {
+                $errors[] = "Catégorie non renseigné";
+            }
+            $synopsis = $request->request->get("synopsis");
+            if ($synopsis == "" | $synopsis == null) {
+                $errors[] = "Synopsis non renseigné";
+            }
+            if (strlen($synopsis) > 500) {
+                $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
+            }
+            $prenomAuteur = $request->request->get("prenomAuteur");
+            if ($prenomAuteur == "" | $prenomAuteur == null) {
+                $errors[] = "Prénom de l'auteur non renseigné";
+            }
+            if (strlen($prenomAuteur) > 20) {
+                $errors[] = "Le prénom de l'auteur ne doit pas faire plus de 20 caractères";
+            }
+            $nomAuteur = $request->request->get("nomAuteur");
+            if ($nomAuteur == "" | $nomAuteur == null) {
+                $errors[] = "Nom de l'auteur non renseigné";
+            }
+            if (strlen($nomAuteur) > 20) {
+                $errors[] = "Le nom de l'auteur ne doit pas faire plus de 20 caractères";
+            }
         }
-        if (strlen($nom) > 20) {
-            $errors[] = "Le nom ne doit pas faire plus de 20 caractères";
-        }
+
         $idProprio = $request->request->get("idProprio");
         if ($idProprio == "" | $idProprio == null) {
             $errors[] = "Proprietaire non renseigné";
@@ -479,32 +544,6 @@ class ModifController extends AbstractController
         $allChildren = $request->request->get("allChildren");
         if ($allChildren == "" | $allChildren == null) {
             $errors[] = "Variable boolenne de la case à cocher non spécifiée";
-        }
-
-        $idCategorie = $request->request->get("idCategorie");
-        if ($idCategorie == "" | $idCategorie == null) {
-            $errors[] = "Catégorie non renseigné";
-        }
-        $synopsis = $request->request->get("synopsis");
-        if ($synopsis == "" | $synopsis == null) {
-            $errors[] = "Synopsis non renseigné";
-        }
-        if (strlen($synopsis) > 500) {
-            $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
-        }
-        $prenomAuteur = $request->request->get("prenomAuteur");
-        if ($prenomAuteur == "" | $prenomAuteur == null) {
-            $errors[] = "Prénom de l'auteur non renseigné";
-        }
-        if (strlen($prenomAuteur) > 20) {
-            $errors[] = "Le prénom de l'auteur ne doit pas faire plus de 20 caractères";
-        }
-        $nomAuteur = $request->request->get("nomAuteur");
-        if ($nomAuteur == "" | $nomAuteur == null) {
-            $errors[] = "Nom de l'auteur non renseigné";
-        }
-        if (strlen($nomAuteur) > 20) {
-            $errors[] = "Le nom de l'auteur ne doit pas faire plus de 20 caractères";
         }
 
         if (sizeof($errors) > 0) {
@@ -530,18 +569,7 @@ class ModifController extends AbstractController
 
                     return $response;
                 }
-            }
-            $categorieRepository = $em->getRepository(Categories::class);
-            $categorie = $categorieRepository->findById($idCategorie);
-            if (gettype($categorie) == "array" & sizeof($categorie) == 0) {
-                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Categorie non existante"]]));
-                $response->headers->set('Content-Type', 'application/json');
 
-                return $response;
-            }
-            $categorie = $categorie[0];
-
-            if ($idProprio != $this->getUser()->getId()) {
                 $serie->setUser($user);
                 if ($allChildren == "true") {
                     $saisonRepository = $em->getRepository(Saisons::class);
@@ -563,30 +591,43 @@ class ModifController extends AbstractController
                     }
                 }
             }
-            $serie->setNom($nom);
-            $serie->setSynopsis($synopsis);
-            $serie->setPrenomAuteur($prenomAuteur);
-            $serie->setNomAuteur($nomAuteur);
-            $serie->setCategorie($categorie);
-            $image = $request->files->get('image');
 
-            if ($image != null) {
-                $image = $image->getPathName();
-                if (explode("/" , mime_content_type($image))[0] != "image") {
-                    $errors[] = "Ce fichier n'est pas une image";
-                    unlink($image);
+            if ($this->getUser()->getPerm() == "uploader") {
+                $categorieRepository = $em->getRepository(Categories::class);
+                $categorie = $categorieRepository->findById($idCategorie);
+                if (gettype($categorie) == "array" & sizeof($categorie) == 0) {
+                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Categorie non existante"]]));
+                    $response->headers->set('Content-Type', 'application/json');
+
+                    return $response;
                 }
-                $ext = ".".explode("/" , mime_content_type($image))[1];
-                $n = random_int(1, 10**15);
-                $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/sagas/";
-                while(file_exists($destination.$n.$ext)) {
-                    $n = random_int(1, 10**15);
+                $categorie = $categorie[0];
+
+                $serie->setNom($nom);
+                $serie->setSynopsis($synopsis);
+                $serie->setPrenomAuteur($prenomAuteur);
+                $serie->setNomAuteur($nomAuteur);
+                $serie->setCategorie($categorie);
+                $image = $request->files->get('image');
+
+                if ($image != null) {
+                    $image = $image->getPathName();
+                    if (explode("/", mime_content_type($image))[0] != "image") {
+                        $errors[] = "Ce fichier n'est pas une image";
+                        unlink($image);
+                    }
+                    $ext = "." . explode("/", mime_content_type($image))[1];
+                    $n = random_int(1, 10 ** 15);
+                    $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/sagas/";
+                    while (file_exists($destination . $n . $ext)) {
+                        $n = random_int(1, 10 ** 15);
+                    }
+                    $destination = $destination . $n . $ext;
+                    move_uploaded_file($image, $destination);
+                    $oldImage = $serie->getImage();
+                    $serie->setImage("/imgs/sagas/" . $n . $ext);
+                    unlink("/root/projects/streamingWebSite/streamingSynfony/public" . $oldImage);
                 }
-                $destination = $destination.$n.$ext;
-                move_uploaded_file ( $image , $destination);
-                $oldImage = $serie->getImage();
-                $serie->setImage("/imgs/sagas/".$n.$ext);
-                unlink ("/root/projects/streamingWebSite/streamingSynfony/public".$oldImage);
             }
 
             $em->persist($serie);
@@ -633,13 +674,22 @@ class ModifController extends AbstractController
         }
         $userRepository = $em->getRepository(Users::class);
         $categorieRepository = $em->getRepository(Categories::class);
-        return $this->render('modif/modifSaga.html.twig', [
-            'controller_name' => "ModifController",
-            'me'      => $this->getUser(),
-            'saga'    => $saga,
-            'categories'   => $categorieRepository->findAll(),
-            'users'        => $userRepository->findAll()
-        ]);
+        if ($this->getUser()->getPerm() == "uploader") {
+            return $this->render('modif/modifSaga.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'saga'    => $saga,
+                'categories'   => $categorieRepository->findAll(),
+                'users'        => $userRepository->findAll()
+            ]);
+        } else {
+            return $this->render('modif/modifSagaOnlyProprio.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'saga'    => $saga,
+                'users'        => $userRepository->findAll()
+            ]);
+        }
     }
     /**
      * @Route("/modif/applySaga", name="modifApplySaga")
@@ -677,13 +727,42 @@ class ModifController extends AbstractController
         }
 
         $errors = array();
-        $nom = $request->request->get("nom");
-        if ($nom == "" | $nom == null) {
-            $errors[] = "Nom non renseigné";
+
+        if ($this->getUser()->getPerm() == "uploader") {
+            $nom = $request->request->get("nom");
+            if ($nom == "" | $nom == null) {
+                $errors[] = "Nom non renseigné";
+            }
+            if (strlen($nom) > 20) {
+                $errors[] = "Le nom ne doit pas faire plus de 20 caractères";
+            }
+            $idCategorie = $request->request->get("idCategorie");
+            if ($idCategorie == "" | $idCategorie == null) {
+                $errors[] = "Catégorie non renseigné";
+            }
+            $synopsis = $request->request->get("synopsis");
+            if ($synopsis == "" | $synopsis == null) {
+                $errors[] = "Synopsis non renseigné";
+            }
+            if (strlen($synopsis) > 500) {
+                $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
+            }
+            $prenomAuteur = $request->request->get("prenomAuteur");
+            if ($prenomAuteur == "" | $prenomAuteur == null) {
+                $errors[] = "Prénom de l'auteur non renseigné";
+            }
+            if (strlen($prenomAuteur) > 20) {
+                $errors[] = "Le prénom de l'auteur ne doit pas faire plus de 20 caractères";
+            }
+            $nomAuteur = $request->request->get("nomAuteur");
+            if ($nomAuteur == "" | $nomAuteur == null) {
+                $errors[] = "Nom de l'auteur non renseigné";
+            }
+            if (strlen($nomAuteur) > 20) {
+                $errors[] = "Le nom de l'auteur ne doit pas faire plus de 20 caractères";
+            }
         }
-        if (strlen($nom) > 20) {
-            $errors[] = "Le nom ne doit pas faire plus de 20 caractères";
-        }
+
         $idProprio = $request->request->get("idProprio");
         if ($idProprio == "" | $idProprio == null) {
             $errors[] = "Proprietaire non renseigné";
@@ -691,32 +770,6 @@ class ModifController extends AbstractController
         $allChildren = $request->request->get("allChildren");
         if ($allChildren == "" | $allChildren == null) {
             $errors[] = "Variable boolenne de la case à cocher non spécifiée";
-        }
-
-        $idCategorie = $request->request->get("idCategorie");
-        if ($idCategorie == "" | $idCategorie == null) {
-            $errors[] = "Catégorie non renseigné";
-        }
-        $synopsis = $request->request->get("synopsis");
-        if ($synopsis == "" | $synopsis == null) {
-            $errors[] = "Synopsis non renseigné";
-        }
-        if (strlen($synopsis) > 500) {
-            $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
-        }
-        $prenomAuteur = $request->request->get("prenomAuteur");
-        if ($prenomAuteur == "" | $prenomAuteur == null) {
-            $errors[] = "Prénom de l'auteur non renseigné";
-        }
-        if (strlen($prenomAuteur) > 20) {
-            $errors[] = "Le prénom de l'auteur ne doit pas faire plus de 20 caractères";
-        }
-        $nomAuteur = $request->request->get("nomAuteur");
-        if ($nomAuteur == "" | $nomAuteur == null) {
-            $errors[] = "Nom de l'auteur non renseigné";
-        }
-        if (strlen($nomAuteur) > 20) {
-            $errors[] = "Le nom de l'auteur ne doit pas faire plus de 20 caractères";
         }
 
         if (sizeof($errors) > 0) {
@@ -742,18 +795,6 @@ class ModifController extends AbstractController
 
                     return $response;
                 }
-            }
-            $categorieRepository = $em->getRepository(Categories::class);
-            $categorie = $categorieRepository->findById($idCategorie);
-            if (gettype($categorie) == "array" & sizeof($categorie) == 0) {
-                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Categorie non existante"]]));
-                $response->headers->set('Content-Type', 'application/json');
-
-                return $response;
-            }
-            $categorie = $categorie[0];
-
-            if ($idProprio != $this->getUser()->getId()) {
                 $saga->setUser($user);
                 if ($allChildren == "true") {
                     $filmRepository = $em->getRepository(Films::class);
@@ -766,30 +807,43 @@ class ModifController extends AbstractController
                     }
                 }
             }
-            $saga->setNom($nom);
-            $saga->setSynopsis($synopsis);
-            $saga->setPrenomAuteur($prenomAuteur);
-            $saga->setNomAuteur($nomAuteur);
-            $saga->setCategorie($categorie);
-            $image = $request->files->get('image');
 
-            if ($image != null) {
-                $image = $image->getPathName();
-                if (explode("/" , mime_content_type($image))[0] != "image") {
-                    $errors[] = "Ce fichier n'est pas une image";
-                    unlink($image);
+            if ($this->getUser()->getPerm() == "uploader") {
+                $categorieRepository = $em->getRepository(Categories::class);
+                $categorie = $categorieRepository->findById($idCategorie);
+                if (gettype($categorie) == "array" & sizeof($categorie) == 0) {
+                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Categorie non existante"]]));
+                    $response->headers->set('Content-Type', 'application/json');
+
+                    return $response;
                 }
-                $ext = ".".explode("/" , mime_content_type($image))[1];
-                $n = random_int(1, 10**15);
-                $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/sagas/";
-                while(file_exists($destination.$n.$ext)) {
-                    $n = random_int(1, 10**15);
+                $categorie = $categorie[0];
+
+                $saga->setNom($nom);
+                $saga->setSynopsis($synopsis);
+                $saga->setPrenomAuteur($prenomAuteur);
+                $saga->setNomAuteur($nomAuteur);
+                $saga->setCategorie($categorie);
+                $image = $request->files->get('image');
+
+                if ($image != null) {
+                    $image = $image->getPathName();
+                    if (explode("/", mime_content_type($image))[0] != "image") {
+                        $errors[] = "Ce fichier n'est pas une image";
+                        unlink($image);
+                    }
+                    $ext = "." . explode("/", mime_content_type($image))[1];
+                    $n = random_int(1, 10 ** 15);
+                    $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/sagas/";
+                    while (file_exists($destination . $n . $ext)) {
+                        $n = random_int(1, 10 ** 15);
+                    }
+                    $destination = $destination . $n . $ext;
+                    move_uploaded_file($image, $destination);
+                    $oldImage = $saga->getImage();
+                    $saga->setImage("/imgs/sagas/" . $n . $ext);
+                    unlink("/root/projects/streamingWebSite/streamingSynfony/public" . $oldImage);
                 }
-                $destination = $destination.$n.$ext;
-                move_uploaded_file ( $image , $destination);
-                $oldImage = $saga->getImage();
-                $saga->setImage("/imgs/sagas/".$n.$ext);
-                unlink ("/root/projects/streamingWebSite/streamingSynfony/public".$oldImage);
             }
 
             $em->persist($saga);
@@ -837,14 +891,23 @@ class ModifController extends AbstractController
         $sagaRepository = $em->getRepository(Sagas::class);
         $categorieRepository = $em->getRepository(Categories::class);
         $userRepository = $em->getRepository(Users::class);
-        return $this->render('modif/modifFilm.html.twig', [
-            'controller_name' => "ModifController",
-            'me'      => $this->getUser(),
-            'film'    => $film,
-            'sagas'   => $sagaRepository->findAll(),
-            'categories'   => $categorieRepository->findAll(),
-            'users'        => $userRepository->findAll()
-        ]);
+        if ($this->getUser()->getPerm() == "uploader") {
+            return $this->render('modif/modifFilm.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'film'    => $film,
+                'sagas'   => $sagaRepository->findAll(),
+                'categories'   => $categorieRepository->findAll(),
+                'users'        => $userRepository->findAll()
+            ]);
+        } else {
+            return $this->render('modif/modifFilmOnlyProprio.html.twig', [
+                'controller_name' => "ModifController",
+                'me'      => $this->getUser(),
+                'film'    => $film,
+                'users'        => $userRepository->findAll()
+            ]);
+        }
     }
 
     /**
@@ -884,58 +947,62 @@ class ModifController extends AbstractController
         }
 
         $errors = [];
-        $urls = explode(",",$request->request->get("URLs"));
-        if (sizeof($urls) == 0) {
-            $errors[] = "Aucune URL spécifiée";
+
+        if ($this->getUser()->getPerm() == "uploader") {
+            $urls = explode(",", $request->request->get("URLs"));
+            if (sizeof($urls) == 0) {
+                $errors[] = "Aucune URL spécifiée";
+            }
+            $idSaga = $request->request->get("idSaga");
+            if ($idSaga == null) {
+                $idSaga = "";
+            }
+            $titre = $request->request->get("titre");
+            if ($titre == "" | $titre == null) {
+                $errors[] = "Titre non renseigné";
+            }
+            if (strlen($titre) > 30) {
+                $errors[] = "Le film ne doit pas faire plus de 30 caractères";
+            }
+            $idCategorie = $request->request->get("idCategorie");
+            if (($idCategorie == "" | $idCategorie == null) & $idSaga == "") {
+                $errors[] = "Catégorie non renseigné";
+            }
+            $duree = $request->request->get("duree");
+            if ($duree == "" | $duree == null) {
+                $errors[] = "Durée non renseigné";
+            }
+            $synopsis = $request->request->get("synopsis");
+            if ($synopsis == "" | $synopsis == null) {
+                $errors[] = "Synopsis non renseigné";
+            }
+            if (strlen($synopsis) > 500) {
+                $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
+            }
+            $dateS = $request->request->get("dateS");
+            if ($dateS == "" | $dateS == null) {
+                $errors[] = "Date de sortie non renseigné";
+            }
+            $prenomAuteur = $request->request->get("prenomAuteur");
+            if (($prenomAuteur == "" | $prenomAuteur == null) & $idSaga == "") {
+                $errors[] = "Prénom de l'auteur non renseigné";
+            }
+            if (strlen($prenomAuteur) > 30) {
+                $errors[] = "Le prénom de l'auteur ne doit pas faire plus de 30 caractères";
+            }
+
+            $nomAuteur = $request->request->get("nomAuteur");
+            if (($nomAuteur == "" | $nomAuteur == null) & $idSaga == "") {
+                $errors[] = "Nom de l'auteur non renseigné";
+            }
+            if (strlen($nomAuteur) > 30) {
+                $errors[] = "Le nom de l'auteur ne doit pas faire plus de 30 caractères";
+            }
         }
+
         $idProprio = $request->request->get("idProprio");
         if ($idProprio == "" | $idProprio == null) {
             $errors[] = "Proprietaire non renseigné";
-        }
-        $idSaga = $request->request->get("idSaga");
-        if ($idSaga == null) {
-            $idSaga = "";
-        }
-        $titre = $request->request->get("titre");
-        if ($titre == "" | $titre == null) {
-            $errors[] = "Titre non renseigné";
-        }
-        if (strlen($titre) > 30) {
-            $errors[] = "Le film ne doit pas faire plus de 30 caractères";
-        }
-        $idCategorie = $request->request->get("idCategorie");
-        if (($idCategorie == "" | $idCategorie == null) & $idSaga == "") {
-            $errors[] = "Catégorie non renseigné";
-        }
-        $duree = $request->request->get("duree");
-        if ($duree == "" | $duree == null) {
-            $errors[] = "Durée non renseigné";
-        }
-        $synopsis = $request->request->get("synopsis");
-        if ($synopsis == "" | $synopsis == null) {
-            $errors[] = "Synopsis non renseigné";
-        }
-        if (strlen($synopsis) > 500) {
-            $errors[] = "Le synopsis ne doit pas faire plus de 500 caractères";
-        }
-        $dateS = $request->request->get("dateS");
-        if ($dateS == "" | $dateS == null) {
-            $errors[] = "Date de sortie non renseigné";
-        }
-        $prenomAuteur = $request->request->get("prenomAuteur");
-        if (($prenomAuteur == "" | $prenomAuteur == null) & $idSaga == "") {
-            $errors[] = "Prénom de l'auteur non renseigné";
-        }
-        if (strlen($prenomAuteur) > 30) {
-            $errors[] = "Le prénom de l'auteur ne doit pas faire plus de 30 caractères";
-        }
-
-        $nomAuteur = $request->request->get("nomAuteur");
-        if (($nomAuteur == "" | $nomAuteur == null) & $idSaga == "") {
-            $errors[] = "Nom de l'auteur non renseigné";
-        }
-        if (strlen($nomAuteur) > 30) {
-            $errors[] = "Le nom de l'auteur ne doit pas faire plus de 30 caractères";
         }
 
         if (sizeof($errors) > 0) {
@@ -960,84 +1027,84 @@ class ModifController extends AbstractController
 
                     return $response;
                 }
+                $film->setUser($user);
             }
 
-            if ($idSaga == "") {
-                $categorieRepository = $em->getRepository(Categories::class);
-                $categorie = $categorieRepository->findById($idCategorie);
-                if (gettype($categorie) == "array" & sizeof($categorie) == 0) {
-                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Categorie non existante"]]));
-                    $response->headers->set('Content-Type', 'application/json');
-
-                    return $response;
-                }
-                $categorie = $categorie[0];
-            } else {
-                $sagaRepository = $em->getRepository(Sagas::class);
-                $saga = $sagaRepository->findById($idSaga);
-                if (gettype($saga) == "array" & sizeof($saga) == 0) {
-                    $response = new Response(json_encode(["rep" => "failed", "errors" => ["Saga non existante"]]));
-                    $response->headers->set('Content-Type', 'application/json');
-
-                    return $response;
-                }
-                $saga = $saga[0];
-                if ($saga->getUser()->getId() != $this->getUser()->getId()) {
-                    if (($film->getSaga() != null & $saga->getId() != $film->getSaga()->getId()) |
-                        $film->getSaga() == null) {
-                        $response = new Response(json_encode(["rep" => "failed", "errors" => ["Cette saga ne vous appartiens pas"]]));
+            if ($this->getUser()->getPerm() == "uploader") {
+                if ($idSaga == "") {
+                    $categorieRepository = $em->getRepository(Categories::class);
+                    $categorie = $categorieRepository->findById($idCategorie);
+                    if (gettype($categorie) == "array" & sizeof($categorie) == 0) {
+                        $response = new Response(json_encode(["rep" => "failed", "errors" => ["Categorie non existante"]]));
                         $response->headers->set('Content-Type', 'application/json');
 
                         return $response;
                     }
-                }
-            }
+                    $categorie = $categorie[0];
+                } else {
+                    $sagaRepository = $em->getRepository(Sagas::class);
+                    $saga = $sagaRepository->findById($idSaga);
+                    if (gettype($saga) == "array" & sizeof($saga) == 0) {
+                        $response = new Response(json_encode(["rep" => "failed", "errors" => ["Saga non existante"]]));
+                        $response->headers->set('Content-Type', 'application/json');
 
-            $film->setTitre($titre);
-            if ($idProprio != $this->getUser()->getId()) {
-                $film->setUser($user);
-            }
-            $film->setDuree(new \DateTime($duree));
-            $film->setSynopsis($synopsis);
-            $film->setDateSortie(new \DateTime($dateS));
-            if ($idSaga == "") {
-                $film->setPrenomAuteur($prenomAuteur);
-                $film->setNomAuteur($nomAuteur);
-                $film->setCategorie($categorie);
-                $film->setSaga(null);
-            } else {
-                $film->setSaga($saga);
-            }
-            $urlRepository = $em->getRepository(URLs::class);
-            $urlsOrigin = $urlRepository->findByFilmId($id);
-            foreach ($urlsOrigin as $url) {
-                $em->remove($url);
-            }
-            foreach ($urls as $url) {
-                $urlObject = new URLs();
-                $urlObject->setLien($url);
-                $urlObject->setFilm($film);
-                $em->persist($urlObject);
-            }
-            $image = $request->files->get('image');
+                        return $response;
+                    }
+                    $saga = $saga[0];
+                    if ($saga->getUser()->getId() != $this->getUser()->getId()) {
+                        if (($film->getSaga() != null & $saga->getId() != $film->getSaga()->getId()) |
+                            $film->getSaga() == null) {
+                            $response = new Response(json_encode(["rep" => "failed", "errors" => ["Cette saga ne vous appartiens pas"]]));
+                            $response->headers->set('Content-Type', 'application/json');
 
-            if ($image != null) {
-                $image = $image->getPathName();
-                if (explode("/" , mime_content_type($image))[0] != "image") {
-                    $errors[] = "Ce fichier n'est pas une image";
-                    unlink($image);
+                            return $response;
+                        }
+                    }
                 }
-                $ext = ".".explode("/" , mime_content_type($image))[1];
-                $n = random_int(1, 10**15);
-                $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/films/";
-                while(file_exists($destination.$n.$ext)) {
-                    $n = random_int(1, 10**15);
+
+                $film->setTitre($titre);
+                $film->setDuree(new \DateTime($duree));
+                $film->setSynopsis($synopsis);
+                $film->setDateSortie(new \DateTime($dateS));
+                if ($idSaga == "") {
+                    $film->setPrenomAuteur($prenomAuteur);
+                    $film->setNomAuteur($nomAuteur);
+                    $film->setCategorie($categorie);
+                    $film->setSaga(null);
+                } else {
+                    $film->setSaga($saga);
                 }
-                $destination = $destination.$n.$ext;
-                move_uploaded_file ( $image , $destination);
-                $oldImage = $film->getImage();
-                $film->setImage("/imgs/films/".$n.$ext);
-                unlink ("/root/projects/streamingWebSite/streamingSynfony/public".$oldImage);
+                $urlRepository = $em->getRepository(URLs::class);
+                $urlsOrigin = $urlRepository->findByFilmId($id);
+                foreach ($urlsOrigin as $url) {
+                    $em->remove($url);
+                }
+                foreach ($urls as $url) {
+                    $urlObject = new URLs();
+                    $urlObject->setLien($url);
+                    $urlObject->setFilm($film);
+                    $em->persist($urlObject);
+                }
+                $image = $request->files->get('image');
+
+                if ($image != null) {
+                    $image = $image->getPathName();
+                    if (explode("/", mime_content_type($image))[0] != "image") {
+                        $errors[] = "Ce fichier n'est pas une image";
+                        unlink($image);
+                    }
+                    $ext = "." . explode("/", mime_content_type($image))[1];
+                    $n = random_int(1, 10 ** 15);
+                    $destination = "/root/projects/streamingWebSite/streamingSynfony/public/imgs/films/";
+                    while (file_exists($destination . $n . $ext)) {
+                        $n = random_int(1, 10 ** 15);
+                    }
+                    $destination = $destination . $n . $ext;
+                    move_uploaded_file($image, $destination);
+                    $oldImage = $film->getImage();
+                    $film->setImage("/imgs/films/" . $n . $ext);
+                    unlink("/root/projects/streamingWebSite/streamingSynfony/public" . $oldImage);
+                }
             }
 
             $em->persist($film);

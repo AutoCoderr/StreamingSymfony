@@ -3,5 +3,197 @@
 {% block body %}
 <center>
     <h1> - Acceuil - </h1>
+    <br/>
+    <h2>Films et séries les plus vues</h2>
+    <br/>
+    <select style="position: absolute; left: 15%; top: {{ is_mobile() ? 19 : 25 }}%;" id="filtrePop" onchange="filtreChoosed()">
+        <option value="pop">Les plus vus</option>
+        <option value="popinv">Les moins vus</option>
+    </select>
+    <div style="position: absolute; left: {{ is_mobile() ? 60 : 75 }}%; top: {{ is_mobile() ? 19 : 25 }}%;"><input style="width: {{ is_mobile() ? 80 : 150 }}px;"placeholder="Recherche" value="{{ word }}" type="text" id="keyWord"/><input type="button" value="GO" onclick="searchByKeyWord()"/></div>
+    <div id="displayMetrages"></div>
 </center>
+{% endblock %}
+
+{% block javascripts %}
+    {% include 'filtres/javascript.twig' %}
+    <script>
+        $("#filtrePop").val("{{ filtre }}");
+        const isMobile = (screen.width < screen.height);
+        {% set nbSerie = 0 %}
+        {% for serie in series %}
+            {% if serie.saisons|length > 0 %}
+                {% set nbSaison = 0 %}
+                {% for saison in serie.saisons %}
+                    {% if saison.episodes|length > 0 %}
+                        {% set nbSaison = nbSaison + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {% if nbSaison > 0 %}
+                    {% set nbSerie = nbSerie+1 %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% if films|length + nbSerie > 0 %}
+            let liste = [];
+            {% for film in films %}
+            liste.push({
+                id: {{ film.id }}, type: "film", titre: "{{ film.titre }}", duree: "{{ film.duree|date('H:i') }}",
+                image: "{{ film.image }}", categorie: "{{ film.categorie.nom }}",
+                {% if app.user %}
+                your: {{ (film.User.id == me.id) ? "true" : "false" }},
+                {% else %}
+                your: false,
+                {% endif %}
+                permUploader: "{{ film.User.perm }}",
+                idUploader: {{ (film.saga == null) ? film.User.id : film.saga.User.id }},
+                nameUploader: "{{ (film.saga == null) ? film.User.prenom ~ " " ~ film.User.nom : film.saga.User.prenom ~ " " ~ film.saga.User.nom }}",
+                saga: {{ (film.saga == null) ? "null" : film.saga.id }},
+                scorePop: {{ film.vues }}
+            });
+            {% endfor %}
+
+            {% for serie in series %}
+                {% set nbSaison = 0 %}
+                {% for saison in serie.saisons %}
+                    {% if saison.episodes|length > 0 %}
+                        {% set nbSaison = nbSaison + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {% if nbSaison > 0 %}
+                    {% set scoreSerie = 0 %}
+                    {% for saison in serie.saisons %}
+                        {% if saison.episodes|length > 0 %}
+                            {% set scoreSaison = 0 %}
+                            {% for episode in saison.episodes %}
+                                {% set scoreSaison = scoreSaison + episode.vues %}
+                            {% endfor %}
+
+                            {% set scoreSaison = scoreSaison / saison.episodes|length %}
+                            {% set scoreSerie = scoreSerie + scoreSaison %}
+                        {% endif %}
+                    {% endfor %}
+                    {% set scoreSerie = scoreSerie/nbSaison %}
+                    {% set scoreSerie = scoreSerie|round %}
+                    liste.push({
+                        id: {{ serie.id }}, type: "serie", titre: "{{ serie.nom }}",
+                        image: "{{ serie.image }}", categorie: "{{ serie.categorie.nom }}",
+                        {% if app.user %}
+                        your: {{ (serie.User.id == me.id) ? "true" : "false" }},
+                        {% else %}
+                        your: false,
+                        {% endif %}
+                        permUploader: "{{ serie.User.perm }}",
+                        idUploader: {{ serie.User.id }},
+                        nameUploader: "{{ serie.User.prenom ~ " " ~ serie.User.nom }}",
+                        scorePop: {{ scoreSerie }}
+                    });
+                {% endif %}
+            {% endfor %}
+            liste = filtrePopu(liste,"{{ filtre }}");
+            if ("{{ word }}" != "") {
+                liste = filtreNom(liste, "{{ word }}");
+            }
+            const numberPerPage = (isMobile) ? 3 : 9;
+            const start = {{ page }}*numberPerPage;
+            const end = ({{ page }}+1)*numberPerPage;
+            if (liste.length < start+1) {
+                $("#displayMetrages").html("<font color='orange' size='4'>Aucun métrage</font>");
+            }
+            if (liste.length >= end) {
+                display(liste.slice(start, end));
+            } else {
+                display(liste.slice(start, liste.length));
+            }
+            let numPaginations = liste.length/numberPerPage;
+            if (numPaginations % 1 != 0) {
+                numPaginations = Math.floor(numPaginations + 1);
+            }
+            $("#displayMetrages").append("<br/>");
+            for (let i = 0;i<numPaginations;i++) {
+                $("#displayMetrages").append("<a href='/?page="+i+"&filtre={{ filtre }}{{ word != "" ? "&word="~word : "" }}'>"+(i+1)+"</a>");
+                if (i < numPaginations-1) {
+                    $("#displayMetrages").append(" - ");
+                }
+            }
+        {% else %}
+            $("#displayMetrages").html("<font color='orange' size='4'>Aucun métrage</font>");
+        {% endif %}
+
+
+        function display(liste) {
+            if (liste.length == 0) {
+                $("#displayMetrages").html("<font size='3' color='orange'>Aucun film trouvé</font>")
+                return;
+            }
+            let top;
+            let left;
+            if (!isMobile) {
+                top = screen.height*0.3;
+                left = screen.width*0.2;
+            } else {
+                top = screen.height*0.35;
+                left = screen.width*0.45;
+            }
+            let listStr = "<br><br><br><br><br><br><br><br><br><br><br><br>";
+            for (let i=0;i<liste.length;i++) {
+                let lien;
+                let textBottom;
+                let funcSuppr;
+                if (liste[i].type == "film") {
+                    lien = "/films/view?id="+liste[i].id;
+                    textBottom = liste[i].duree;
+                    funcSuppr = "supprFilm";
+                } else if (liste[i].type == "serie") {
+                    lien = "/series/saisons/?id="+liste[i].id;
+                    textBottom = liste[i].categorie;
+                    funcSuppr = "supprSerie";
+                }
+                listStr += "<p style='position: absolute; top: "+(top-20)+"px; left: "+left+"px;'><strong>"+liste[i].titre+" ("+liste[i].categorie+")</strong></p><br/>";
+                listStr += "<a href='"+lien+"'><img src='"+liste[i].image+"' style='position: absolute; top: "+top+"px; left: "+left+"px; width: 170px; height: 225px;' /></a>";
+                listStr += "<p style='position: absolute; top: "+(top+200)+"px; left: "+((left+170)-textBottom.length*9)+"px; z-index: 2; background-color: #000; color: #fff;'>"+textBottom+"</p>";
+                if (liste[i].your || (ownPerm === "admin" & liste[i].permUploader !== "admin")) {
+                    listStr += "<input onclick='"+funcSuppr+"("+liste[i].id+")' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + left + "px' type='button' value='supprimer' />";
+                    if (liste[i].your) {
+                        if (liste[i].type === "film") {
+                            listStr += "<input onclick='location.href = `/modif/film?id=" + liste[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 85) + "px' type='button' value='modifier' />";
+                        } else if (liste[i].type === "serie") {
+                            listStr += "<input onclick='location.href = `/modif/serie?id=" + liste[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 85) + "px' type='button' value='modifier' />";
+                        }
+                    }
+                }
+                if (!isMobile) {
+                    left += 350;
+                    if (left >= 300 + (350 * 3)) {
+                        listStr += "<br><br><br><br><br><br><br><br><br><br>";
+                        left = 300;
+                        top += 300;
+                    }
+                } else {
+                    top += 300;
+                    listStr += "<br><br><br><br><br><br><br><br><br><br>";
+                }
+            }
+            $("#displayMetrages").html(listStr);
+        }
+
+        function filtreChoosed() {
+            const filtre = $("#filtrePop").val();
+            if ("{{ word }}" == "") {
+                location.href = "/?page={{ page }}&filtre="+filtre;
+            } else {
+                location.href = "/?page={{ page }}&filtre="+filtre+"&word={{ word }}";
+            }
+        }
+
+        function searchByKeyWord() {
+            const keyWord = $("#keyWord").val();
+            if (keyWord == "") {
+                location.href = "/?page=0&filtre={{ filtre }}";
+            } else {
+                location.href = "/?page=0&filtre={{ filtre }}&word="+keyWord;
+            }
+        }
+
+    </script>
 {% endblock %}

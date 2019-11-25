@@ -3,7 +3,7 @@
 {% block title %}Episodes - Site de streaming{% endblock %}
 
 {% block body %}
-    {% if referer|slice(24,19) == "/series/viewEpisode" %}
+    {% if referer|slice(24,19) == "/series/viewEpisode" or referer|slice(24,14) == "/modif/episode" %}
         <input type="button" value="<=" onclick="location.href = '/series/saisons?id={{ saison.serie.id }}'"/>
     {% else %}
         <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
@@ -11,34 +11,66 @@
     <br/>
     Filtres :
     <br/>
-    <table style="border-spacing: 5px; border-collapse: separate;">
-        <tr>
-            <td>
-                Par nom :<input type="text" id="filtreNom" />
-            </td>
-            <td>
-                Par Uploader :<select id="filtreUploader">
-                    <option value="">Tous</option>
-                    {% for user in users %}
-                        {% if user.perm == "uploader" or user.perm == "admin" %}
-                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </td>
+    {% if is_mobile() %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+                <td style="text-align: center;" rowspan="3">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Par Uploader :<select id="filtreUploader">
+                        <option value="">Tous</option>
+                        {% for user in users %}
+                            {% if user.perm == "uploader" or user.perm == "admin" %}
+                                <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
             <td>
                 Trier : <select id="filtreTrie">
                     <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
                     <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
                 </select>
             </td>
-        </tr>
-        <tr>
-            <td style="text-align: center;" colspan="3">
-                <input type="button" value="Appliquer" onclick="filtre()"/>
-            </td>
-        </tr>
-    </table>
+            </tr>
+        </table>
+    {% else %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+                <td>
+                    Par Uploader :<select id="filtreUploader">
+                        <option value="">Tous</option>
+                        {% for user in users %}
+                            {% if user.perm == "uploader" or user.perm == "admin" %}
+                                <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>
+                    Trier : <select id="filtreTrie">
+                        <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                        <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td style="text-align: center;" colspan="3">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
+        </table>
+    {% endif %}
     <h1> {{ saison.serie.nom }} : <span style="font-size: 30px;">{{ saison.nom }}</span></h1>
     <br/>
     <div id="displayEpisode"></div>

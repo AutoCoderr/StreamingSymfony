@@ -3,89 +3,118 @@
 {% block title %}Séries - Site de streaming{% endblock %}
 
 {% block body %}
-    Filtres :
-    <br/>
-    <table style="border-spacing: 5px; border-collapse: separate;">
-        <tr>
-            <td>
-                Par categorie :
-                <select id="filtreCategorie">
-                    <option value="">Tous</option>
-                    {% for categorie in categories %}
-                        <option value="{{ categorie.nom }}">{{ categorie.nom }}</option>
-                    {% endfor %}
-                </select>
-            </td>
-            <td>
-                Par nom :<input type="text" id="filtreNom" />
-            </td>
-            <td>
-                Par Uploader :<select id="filtreUploader">
-                    <option value="">Tous</option>
-                    {% for user in users %}
-                        {% if user.perm == "uploader" or user.perm == "admin" %}
-                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </td>
-            <td>
-                Trier : <select id="filtreTrie">
-                    <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
-                    <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <td style="text-align: center;" colspan="4">
-                <input type="button" value="Appliquer" onclick="filtre()"/>
-            </td>
-        </tr>
-    </table>
     <h1>Les series</h1>
     <br/>
+    <select style="position: absolute; left: 15%; top: {{ is_mobile() ? 19 : 25 }}%;" id="filtrePop" onchange="filtreChoosed()">
+        <option value="pop">Les plus vus</option>
+        <option value="popinv">Les moins vus</option>
+    </select>
+    <div style="position: absolute; left: {{ is_mobile() ? 60 : 75 }}%; top: {{ is_mobile() ? 19 : 25 }}%;"><input style="width: {{ is_mobile() ? 80 : 150 }}px;"placeholder="Recherche" value="{{ word }}" type="text" id="keyWord"/><input type="button" value="GO" onclick="searchByKeyWord()"/></div>
     <div id="displaySerie"></div>
 {% endblock %}
 {% block javascripts %}
     {% include 'filtres/javascript.twig' %}
     <script>
+        $("#filtrePop").val("{{ filtre }}");
+        const isMobile = (screen.width < screen.height);
         let liste = [];
-
+        {% set nbSerie = 0 %}
         {% for serie in series %}
-        liste.push({
-            id: {{ serie.id }}, titre: "{{ serie.nom }}",
-            categorie: "{{ serie.categorie.nom }}",
-            image: "{{ serie.image }}",
-            {% if app.user %}
-                your: {{ (serie.User.id == me.id) ? "true" : "false" }},
-            {% else %}
-               your: false,
+            {% if serie.saisons|length > 0 %}
+                {% set nbSaison = 0 %}
+                {% for saison in serie.saisons %}
+                    {% if saison.episodes|length > 0 %}
+                        {% set nbSaison = nbSaison + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {% if nbSaison > 0 %}
+                    {% set nbSerie = nbSerie+1 %}
+                {% endif %}
             {% endif %}
-            permUploader: "{{ serie.User.perm }}",
-            idUploader: {{ serie.User.id }},
-            nameUploader: "{{ serie.User.prenom }} {{ serie.User.nom }}"
-        });
         {% endfor %}
+        {% if nbSerie > 0 %}
+            {% for serie in series %}
+                {% set nbSaison = 0 %}
+                {% for saison in serie.saisons %}
+                    {% if saison.episodes|length > 0 %}
+                        {% set nbSaison = nbSaison + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {% if nbSaison > 0 %}
+                    {% set scoreSerie = 0 %}
+                    {% for saison in serie.saisons %}
+                        {% if saison.episodes|length > 0 %}
+                            {% set scoreSaison = 0 %}
+                            {% for episode in saison.episodes %}
+                                {% set scoreSaison = scoreSaison + episode.vues %}
+                            {% endfor %}
 
-        if (liste.length == 0) {
-            $("#displaySerie").html("<font size='3' color='orange'>Il n'y a aucune série</font>");
-        } else {
-            liste = trieAlphabetique("croissant", liste);
-            display(liste);
-        }
-        $("#filtreUploader").val({{ idUploader }});
-        if ("{{ idUploader }}" !== "") {
-            filtre();
-        }
+                            {% set scoreSaison = scoreSaison / saison.episodes|length %}
+                            {% set scoreSerie = scoreSerie + scoreSaison %}
+                        {% endif %}
+                    {% endfor %}
+                    {% set scoreSerie = scoreSerie/nbSaison %}
+                    {% set scoreSerie = scoreSerie|round %}
+                    liste.push({
+                        id: {{ serie.id }}, type: "serie", titre: "{{ serie.nom }}",
+                        image: "{{ serie.image }}", categorie: "{{ serie.categorie.nom }}",
+                        {% if app.user %}
+                        your: {{ (serie.User.id == me.id) ? "true" : "false" }},
+                        {% else %}
+                        your: false,
+                        {% endif %}
+                        permUploader: "{{ serie.User.perm }}",
+                        idUploader: {{ serie.User.id }},
+                        nameUploader: "{{ serie.User.prenom ~ " " ~ serie.User.nom }}",
+                        scorePop: {{ scoreSerie }}
+                    });
+                {% endif %}
+            {% endfor %}
+            liste = filtrePopu(liste,"{{ filtre }}");
+            if ("{{ word }}" != "") {
+                liste = filtreNom(liste, "{{ word }}");
+            }
+            const numberPerPage = (isMobile) ? 3 : 9;
+            const start = {{ page }}*numberPerPage;
+            const end = ({{ page }}+1)*numberPerPage;
+            if (liste.length < start+1) {
+                $("#displaySerie").html("<font color='orange' size='4'>Aucun métrage</font>");
+            }
+            if (liste.length >= end) {
+                display(liste.slice(start, end));
+            } else {
+                display(liste.slice(start, liste.length));
+            }
+            let numPaginations = liste.length/numberPerPage;
+            if (numPaginations % 1 != 0) {
+                numPaginations = Math.floor(numPaginations + 1);
+            }
+            $("#displaySerie").append("<br/>");
+            for (let i = 0;i<numPaginations;i++) {
+                $("#displaySerie").append("<a href='/films/?page="+i+"&filtre={{ filtre }}{{ word != "" ? "&word="~word : "" }}'>"+(i+1)+"</a>");
+                if (i < numPaginations-1) {
+                    $("#displaySerie").append(" - ");
+                }
+            }
+        {% else %}
+            $("#displaySerie").html("<font color='orange' size='4'>Aucune série</font>");
+        {% endif %}
+
         function display(serieList) {
             if (serieList.length == 0) {
-                $("#displaySerie").html("<font size='3' color='orange'>Aucune serie trouvée</font>")
+                $("#displaySerie").html("<font size='3' color='orange'>Aucune serie trouvé</font>")
                 return;
             }
-            let top = 240;
-            let left = 400;
-            let listStr = "<br><br><br><br><br><br><br><br><br><br><br><br><br><br>";
-            listStr += "<table>";
+            let top;
+            let left;
+            if (!isMobile) {
+                top = 300;
+                left = screen.width*0.2;
+            } else {
+                top = 330;
+                left = screen.width*0.45;
+            }
+            let listStr = "<br><br><br><br><br><br><br><br><br><br>";
             for (let i=0;i<serieList.length;i++) {
                 let lien;
                 let textBottom;
@@ -95,25 +124,24 @@
                 listStr += "<p style='position: absolute; top: "+(top-20)+"px; left: "+left+"px;'><strong>"+serieList[i].titre+"</strong></p><br/>";
                 listStr += "<a href='"+lien+"'><img src='"+serieList[i].image+"' style='position: absolute; top: "+top+"px; left: "+left+"px; width: 170px; height: 225px;' /></a>";
                 listStr += "<p style='position: absolute; top: "+(top+205)+"px; left: "+((left+170)-textBottom.length*8)+"px; z-index: 2; background-color: #000; color: #fff;'>"+textBottom+"</p>";
-                if (serieList[i].your) {
-                    listStr += "<input onclick='supprSerie("+serieList[i].id+")' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + left + "px' type='button' value='supprimer' />";
-                    listStr += "<input onclick='location.href = `/modif/serie?id=" + serieList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
-                }
                 if (serieList[i].your || (ownPerm === "admin" & serieList[i].permUploader !== "admin")) {
                     listStr += "<input onclick='supprSerie("+serieList[i].id+")' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + left + "px' type='button' value='supprimer' />";
                     if (serieList[i].your) {
-                        listStr += "<input onclick='location.href = `/modif/serie?id=" + serieList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
+                        listStr += "<input onclick='location.href = `/modif/serie?id=" + serieList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 85) + "px' type='button' value='modifier' />";
                     }
                 }
-                listStr += "</td></tr>";
-                left += 230;
-                if (left >= 400+(230*3)) {
-                    listStr += "<br><br><br><br><br><br><br><br><br><br><br><br>";
-                    left = 400;
+                if (!isMobile) {
+                    left += 350;
+                    if (left >= 300 + (350 * 3)) {
+                        listStr += "<br><br><br><br><br><br><br><br>";
+                        left = 300;
+                        top += 300;
+                    }
+                } else {
                     top += 300;
+                    listStr += "<br><br><br><br><br><br><br><br>";
                 }
             }
-            listStr += "</table>";
             $("#displaySerie").html(listStr);
         }
 
@@ -150,6 +178,24 @@
                     alert(error);
                 }
             });
+        }
+
+        function filtreChoosed() {
+            const filtre = $("#filtrePop").val();
+            if ("{{ word }}" == "") {
+                location.href = "/series/?page={{ page }}&filtre="+filtre;
+            } else {
+                location.href = "/series/?page={{ page }}&filtre="+filtre+"&word={{ word }}";
+            }
+        }
+
+        function searchByKeyWord() {
+            const keyWord = $("#keyWord").val();
+            if (keyWord == "") {
+                location.href = "/series/?page=0&filtre={{ filtre }}";
+            } else {
+                location.href = "/series/?page=0&filtre={{ filtre }}&word="+keyWord;
+            }
         }
     </script>
 {% endblock %}

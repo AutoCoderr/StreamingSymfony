@@ -132,6 +132,19 @@ class AdminController extends AbstractController
                 return $response;
             }
             $userToCede = $userToCede[0];
+            if ($userToCede->getId() == $user->getId()) {
+                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Vous ne pouvez pas céder ses métrages à lui même"]]));
+                $response->headers->set('Content-Type', 'application/json');
+                $em->flush();
+                return $response;
+            }
+            if (($userToCede->getPerm() != "admin" & $userToCede->getPerm() != "uploader") | $userToCede->getBanned() == 1) {
+                $response = new Response(json_encode(["rep" => "failed", "errors" => ["Vous pouvez pas céder ses métrages cette personne"]]));
+                $response->headers->set('Content-Type', 'application/json');
+                $em->flush();
+                return $response;
+            }
+
             foreach ($user->getFilms() as $film) {
                 $user->removeFilm($film);
                 $film->setUser($userToCede);
@@ -149,7 +162,7 @@ class AdminController extends AbstractController
                 $saison->setUser($userToCede);
             }
             foreach ($user->getSeries() as $serie) {
-                $user->removeSerie($serie);
+                $user->removeSeries($serie);
                 $serie->setUser($userToCede);
             }
         }

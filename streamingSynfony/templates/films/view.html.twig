@@ -2,6 +2,19 @@
 
 {% block title %}{{ film.titre }}- Site de streaming{% endblock %}
 
+{% block header %}
+    <meta name="description" content="{{ film.synopsis|raw }}" />
+    {% set tags = film.prenomAuteur ~ " " ~ film.nomAuteur ~ "," ~ film.prenomAuteur ~ "," ~ film.nomAuteur %}
+    {% set tags = tags ~ ","~ "film" ~ "," ~ film.titre %}
+    {% if film.titre|split(" ")|length > 1 %}
+        {% for word in film.titre|split(" ") %}
+            {% set tags = tags ~ "," ~ word %}
+        {% endfor %}
+    {% endif %}
+    {% set tags = tags ~ "," ~ film.dateSortie|date("d/m/Y") ~ "," ~ film.dateSortie|date("Y-m-d") %}
+    {% set tags = tags ~ "," ~ film.duree|date("H:i") %}
+    <meta name="keywords" content="{{ tags }}" />
+{% endblock %}
 {% block body %}
     <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
     <h1>{{ film.titre }}</h1>
@@ -17,6 +30,7 @@
         </tr>
     </table>
     <div id="displayLien"></div>
+    <div style="position: absolute; left: 25%;">{{ film.vues }} vues</div>
     <h2>Commentaires : </h2>
     <table id="commentaireList">
         {% for commentaire in film.commentaires %}
@@ -67,7 +81,7 @@
             Surligner : <input id="surlignCommentaire" type="checkbox">
         {% endif %}
     {% else %}
-        <font color="orange" size="3">Vous devez vous inscrire pour pouvoir poster des commentaires.</font>
+        <font color="orange" size="3">Vous devez être inscrit pour pouvoir poster des commentaires.</font>
     {% endif %}
     <br/>
     Date de sortie : {{ film.dateSortie|date("d/m/Y") }}<br/>
@@ -84,6 +98,35 @@
 {% endblock %}
 {% block javascripts %}
 <script>
+
+    setTimeout(() => {
+        let formData = new FormData();
+        formData.append('id', {{ film.id }});
+
+        $.ajax({
+            url:'http://'+window.location.hostname+':8000/films/addView',
+            data:formData,
+            type:'POST',
+            processData: false,
+            dataType: 'json',
+            contentType: false,
+            success: (data) =>
+            {
+                if (data.rep == "failed") {
+                    let errorStr = "Erreur Ajout vues : \n\n";
+                    for (let i=0;i<data.errors.length;i++) {
+                        errorStr += data.errors[i]+"\n";
+                    }
+                    console.log(errorStr);
+                }
+            },
+            error:function(xhr,rrr,error)
+            {
+                alert(error);
+            }
+        });
+    },30*1000);
+
     {% if app.user %}
         let prenom = "{{ me.prenom }}";
         let nom = "{{ me.nom }}";
@@ -92,7 +135,9 @@
 
     $("#bt_1").click();
     function displayLien(lien) {
-        $("#displayLien").html("<iframe allowfullscreen='true' style='width: 800px; height: 450px;' src='"+lien+"' ></iframe>");
+        if ($("#displayLien iframe").attr("src") != lien) {
+            $("#displayLien").html("<iframe allowfullscreen='true' style='width: "+(screen.width*((screen.width < screen.height) ? 1.5 : 0.5))+"px; height: "+((screen.width*((screen.width < screen.height) ? 1.5 : 0.5))/1.7777777777)+"px;' src='" + lien + "' ></iframe>");
+        }
     }
 
     function editForm(id) {

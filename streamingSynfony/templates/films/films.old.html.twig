@@ -1,0 +1,278 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Films - Site de streaming{% endblock %}
+
+{% block body %}
+    Filtres :
+    <br/>
+    {% if is_mobile() %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par categorie :
+                    <select id="filtreCategorie">
+                        <option value="">Tous</option>
+                        {% for categorie in categories %}
+                            <option value="{{ categorie.nom }}">{{ categorie.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td style="text-align: center;" rowspan="5">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    par type : <select id="filtreType">
+                        <option value="">Tous</option>
+                        <option value="film">Films</option>
+                        <option value="saga">Sagas</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Par Uploader :<select id="filtreUploader">
+                        <option value="">Tous</option>
+                        {% for user in users %}
+                            {% if user.perm == "uploader" or user.perm == "admin" %}
+                                <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+                <td>
+                    Trier : <select id="filtreTrie">
+                        <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                        <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                    </select>
+                </td>
+            </tr>
+        </table>
+    {% else %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par categorie :
+                    <select id="filtreCategorie">
+                        <option value="">Tous</option>
+                        {% for categorie in categories %}
+                            <option value="{{ categorie.nom }}">{{ categorie.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+                <td>
+                    par type : <select id="filtreType">
+                        <option value="">Tous</option>
+                        <option value="film">Films</option>
+                        <option value="saga">Sagas</option>
+                    </select>
+                </td>
+                <td>
+                    Par Uploader :<select id="filtreUploader">
+                        <option value="">Tous</option>
+                        {% for user in users %}
+                            {% if user.perm == "uploader" or user.perm == "admin" %}
+                                <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>
+                    Trier : <select id="filtreTrie">
+                        <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                        <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td style="text-align: center;" colspan="5">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
+        </table>
+    {% endif %}
+    <h1>Les films</h1>
+    <br/>
+    <div id="displayFilm"></div>
+{% endblock %}
+{% block javascripts %}
+    {% include 'filtres/javascript.twig' %}
+    <script>
+        const isMobile = (screen.width < screen.height);
+        let liste = [];
+        {% for saga in sagas %}
+            liste.push({type: 'saga', id: {{ saga.id }}, titre: "{{ saga.nom }}",
+                categorie: "{{ saga.categorie.nom }}",
+                image: "{{ saga.image }}",
+                {% if app.user %}
+                    your: {{ (saga.User.id == me.id) ? "true" : "false" }},
+                {% else %}
+                    your: false,
+                {% endif %}
+                permUploader: "{{ saga.User.perm }}",
+                idUploader: {{ saga.User.id }},
+                nameUploader: "{{ saga.User.prenom }} {{ saga.User.nom }}"
+            });
+        {% endfor %}
+
+        {% for film in films %}
+            liste.push({
+                type: 'film', id: {{ film.id }}, titre: "{{ film.titre }}", duree: "{{ film.duree|date('H:i') }}",
+                categorie: "{{ film.categorie.nom }}",
+                image: "{{ film.image }}",
+                {% if app.user %}
+                    your: {{ (film.User.id == me.id) ? "true" : "false" }},
+                {% else %}
+                    your: false,
+                {% endif %}
+                permUploader: "{{ film.User.perm }}",
+                idUploader: {{ film.User.id }},
+                nameUploader: "{{ film.User.prenom }} {{ film.User.nom }}"
+            });
+        {% endfor %}
+
+        if (liste.length == 0) {
+            $("#displayFilm").html("<font size='3' color='orange'>Il n'y a aucun film</font>");
+        } else {
+            liste = trieAlphabetique("croissant", liste);
+            display(liste);
+        }
+        $("#filtreUploader").val({{ idUploader }});
+        if ("{{ idUploader }}" !== "") {
+            filtre();
+        }
+        function display(filmList) {
+            if (filmList.length == 0) {
+                $("#displayFilm").html("<font size='3' color='orange'>Aucun film trouvé</font>")
+                return;
+            }
+            let top;
+            let left;
+            if (!isMobile) {
+                top = screen.height*0.35;
+                left = screen.width*0.2;
+            } else {
+                top = screen.height*0.4;
+                left = screen.width*0.45;
+            }
+            let listStr = "<br><br><br><br><br><br><br><br><br><br>";
+            for (let i=0;i<filmList.length;i++) {
+                let lien;
+                let textBottom;
+                let funcSuppr;
+                if (filmList[i].type == "film") {
+                    lien = "/films/view?id="+filmList[i].id;
+                    textBottom = filmList[i].duree;
+                    funcSuppr = "supprFilm";
+                } else if (filmList[i].type == "saga") {
+                    lien = "/films/viewSaga?id=" + filmList[i].id;
+                    textBottom = "Saga";
+                    funcSuppr = "supprSaga";
+                }
+                listStr += "<p style='position: absolute; top: "+(top-20)+"px; left: "+left+"px;'><strong>"+filmList[i].titre+" ("+filmList[i].categorie+")</strong></p><br/>";
+                listStr += "<a href='"+lien+"'><img src='"+filmList[i].image+"' style='position: absolute; top: "+top+"px; left: "+left+"px; width: 170px; height: 225px;' /></a>";
+                listStr += "<p style='position: absolute; top: "+(top+205)+"px; left: "+(left+135)+"px; z-index: 2; background-color: #000; color: #fff;'>"+textBottom+"</p>";
+                if (filmList[i].your || (ownPerm === "admin" & filmList[i].permUploader !== "admin")) {
+                    listStr += "<input onclick='"+funcSuppr+"("+filmList[i].id+")' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + left + "px' type='button' value='supprimer' />";
+                    if (filmList[i].your) {
+                        if (filmList[i].type === "film") {
+                            listStr += "<input onclick='location.href = `/modif/film?id=" + filmList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
+                        } else if (filmList[i].type === "saga") {
+                            listStr += "<input onclick='location.href = `/modif/saga?id=" + filmList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
+                        }
+                    }
+                }
+                if (!isMobile) {
+                    left += 350;
+                    if (left >= 300 + (350 * 3)) {
+                        listStr += "<br><br><br><br><br><br><br><br>";
+                        left = 300;
+                        top += 300;
+                    }
+                } else {
+                    top += 300;
+                    listStr += "<br><br><br><br><br><br><br><br>";
+                }
+            }
+            $("#displayFilm").html(listStr);
+        }
+        function supprSaga(id) {
+            if (!confirm("ATTENTION! La suppression de cette saga entrenera celle de tous les films.\n Voulez vous continuer?")) {
+                return;
+            }
+            if (!confirm("Êtes vous sûre de vouloir la supprimer ?")) {
+                return;
+            }
+            let formData = new FormData();
+            formData.append('id', id);
+
+            $.ajax({
+                url: 'http://' + window.location.hostname + ':8000/films/deleteSaga',
+                data: formData,
+                type: 'POST',
+                processData: false,
+                dataType: 'json',
+                contentType: false,
+                success: (data) => {
+                    $("#buttons_" + id).css("display", "");
+                    if (data.rep == "success") {
+                        window.location.reload();
+                    } else if (data.rep == "failed") {
+                        let errorStr = "";
+                        for (let i = 0; i < data.errors.length; i++) {
+                            errorStr += data.errors[i] + "\n";
+                        }
+                        alert(errorStr);
+                    }
+                },
+                error: function (xhr, rrr, error) {
+                    alert(error);
+                }
+            });
+        }
+
+        function supprFilm(id) {
+            if (!confirm("Êtes vous sûre de vouloir le supprimer ?")) {
+                return;
+            }
+            let formData = new FormData();
+            formData.append('id', id);
+
+            $.ajax({
+                url:'http://'+window.location.hostname+':8000/films/deleteFilm',
+                data:formData,
+                type:'POST',
+                processData: false,
+                dataType: 'json',
+                contentType: false,
+                success: (data) =>
+                {
+                    $("#buttons_"+id).css("display", "");
+                    if (data.rep == "success") {
+                        window.location.reload();
+                    } else if (data.rep == "failed") {
+                        let errorStr = "";
+                        for (let i=0;i<data.errors.length;i++) {
+                            errorStr += data.errors[i]+"\n";
+                        }
+                        alert(errorStr);
+                    }
+                },
+                error:function(xhr,rrr,error)
+                {
+                    alert(error);
+                }
+            });
+        }
+    </script>
+{% endblock %}

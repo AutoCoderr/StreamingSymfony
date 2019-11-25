@@ -24,6 +24,11 @@ class Films
     private $titre;
 
     /**
+     * @ORM\Column(type="integer")
+     */
+    private $vues = 0;
+
+    /**
      * @ORM\Column(type="time")
      */
     private $duree;
@@ -108,6 +113,18 @@ class Films
     public function setDuree(\DateTimeInterface $duree): self
     {
         $this->duree = $duree;
+
+        return $this;
+    }
+
+    public function getVues(): ?int
+    {
+        return $this->vues;
+    }
+
+    public function setVues(int $vues): self
+    {
+        $this->vues = $vues;
 
         return $this;
     }

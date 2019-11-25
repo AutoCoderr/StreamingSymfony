@@ -24,17 +24,41 @@ class FilmController extends AbstractController
         if ($idUploader == null) {
             $idUploader = "";
         }
-        $em = $this->getDoctrine()->getEntityManager();
-        $filmRepository = $em->getRepository(Films::class);
-        $categorieRepository = $em->getRepository(Categories::class);
-        $sagaRepository = $em->getRepository(Sagas::class);
-        $userRepository = $em->getRepository(Users::class);
-
         if ($this->getUser() == null) {
             $me = "none";
         } else {
             $me = $this->getUser();
         }
+
+        $page = $request->query->get("page");
+        if ($page == null) {
+            $page = 0;
+        }
+        if(!is_numeric($page)) {
+            return $this->render('error.html.twig', [
+                'me'       =>    $me,
+                'error'    =>    "'page' doit être un nombre"
+            ]);
+        }
+        $filtre = $request->query->get("filtre");
+        if ($filtre == null) {
+            $filtre = "pop";
+        } else if ($filtre != "pop" & $filtre != "popinv") {
+            return $this->render('error.html.twig', [
+                'me'       =>    $me,
+                'error'    =>    "Le filtre n'est pas valide"
+            ]);
+        }
+        $word = $request->query->get("word");
+        if ($word == null) {
+            $word = "";
+        }
+
+        $em = $this->getDoctrine()->getEntityManager();
+        $filmRepository = $em->getRepository(Films::class);
+        $categorieRepository = $em->getRepository(Categories::class);
+        $sagaRepository = $em->getRepository(Sagas::class);
+        $userRepository = $em->getRepository(Users::class);
 
         return $this->render('films/films.html.twig', [
             'controller_name' => 'FilmController',
@@ -43,7 +67,10 @@ class FilmController extends AbstractController
             'categories'      => $categorieRepository->findAll(),
             'sagas'           => $sagaRepository->findAll(),
             'users'           => $userRepository->findAll(),
-            'idUploader'      => $idUploader
+            'idUploader'      => $idUploader,
+            'filtre'          => $filtre,
+            'page'            => $page,
+            'word'            => $word
         ]);
     }
 
@@ -223,6 +250,29 @@ class FilmController extends AbstractController
             'users'           => $userRepository->findAll(),
             'idUploader'      => $idUploader
         ]);
+    }
+
+    /**
+     * @Route("/films/addView", name="filmAddView")
+     */
+    function addView(Request $request) {
+        $id = $request->request->get("id");
+        $em = $this->getDoctrine()->getEntityManager();
+        $filmRepository = $em->getRepository(Films::class);
+        $film = $filmRepository->findById($id);
+        if (sizeof($film) == 0) {
+            $response = new Response(json_encode(["rep" => "failed", "errors" => ["Ce film n'existe pas."]]));
+            $response->headers->set('Content-Type', 'application/json');
+            return $response;
+        }
+        $film = $film[0];
+        $film->setVues($film->getVues()+1);
+        $em->persist($film);
+        $em->flush();
+
+        $response = new Response(json_encode(["rep" => "success"]));
+        $response->headers->set('Content-Type', 'application/json');
+        return $response;
     }
 
 

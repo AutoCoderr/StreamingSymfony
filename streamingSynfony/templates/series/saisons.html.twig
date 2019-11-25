@@ -3,7 +3,7 @@
 {% block title %}Séries - Site de streaming{% endblock %}
 
 {% block body %}
-    {% if referer|slice(24,24) == "/series/saisons/episodes" %}
+    {% if referer|slice(24,24) == "/series/saisons/episodes" or referer|slice(24,13) == "/modif/saison" %}
         <input type="button" value="<=" onclick="location.href = '/series'"/>
     {% else %}
         <input type="button" value="<=" onclick="location.href = '{{ referer }}'"/>
@@ -11,34 +11,66 @@
     <br/>
     Filtres :
     <br/>
-    <table style="border-spacing: 5px; border-collapse: separate;">
-        <tr>
-            <td>
-                Par nom :<input type="text" id="filtreNom" />
-            </td>
-            <td>
-                Par Uploader :<select id="filtreUploader">
-                    <option value="">Tous</option>
-                    {% for user in users %}
-                        {% if user.perm == "uploader" or user.perm == "admin" %}
-                            <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </td>
+    {% if is_mobile() %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+                <td style="text-align: center;" rowspan="3">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Par Uploader :<select id="filtreUploader">
+                        <option value="">Tous</option>
+                        {% for user in users %}
+                            {% if user.perm == "uploader" or user.perm == "admin" %}
+                                <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
             <td>
                 Trier : <select id="filtreTrie">
                     <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
                     <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
                 </select>
             </td>
-        </tr>
-        <tr>
-            <td style="text-align: center;" colspan="3">
-                <input type="button" value="Appliquer" onclick="filtre()"/>
-            </td>
-        </tr>
-    </table>
+            </tr>
+        </table>
+    {% else %}
+        <table style="border-spacing: 5px; border-collapse: separate;">
+            <tr>
+                <td>
+                    Par nom :<input type="text" id="filtreNom" />
+                </td>
+                <td>
+                    Par Uploader :<select id="filtreUploader">
+                        <option value="">Tous</option>
+                        {% for user in users %}
+                            {% if user.perm == "uploader" or user.perm == "admin" %}
+                                <option value="{{ user.id }}">{{ user.prenom }} {{ user.nom }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>
+                    Trier : <select id="filtreTrie">
+                        <option value="alphaCroissant">Ordre alphabetique (croissant)</option>
+                        <option value="alphaDecroissant">Ordre alphabetique (decroissant)</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td style="text-align: center;" colspan="3">
+                    <input type="button" value="Appliquer" onclick="filtre()"/>
+                </td>
+            </tr>
+        </table>
+    {% endif %}
     <h1> {{ serie.nom }}</h1>
     <br/>
     <div id="displaySaison"></div>
@@ -46,8 +78,8 @@
 {% block javascripts %}
     {% include 'filtres/javascript.twig' %}
     <script>
+        const isMobile = (screen.width < screen.height);
         let liste = [];
-
         {% for saison in serie.saisons %}
         liste.push({
             id: {{ saison.id }}, titre: "{{ saison.nom }}",
@@ -75,13 +107,19 @@
         }
         function display(saisonList) {
             if (saisonList.length == 0) {
-                $("#displaySaison").html("<font size='3' color='orange'>Aucune saison trouvée</font>")
+                $("#displaySaison").html("<font size='3' color='orange'>Aucune saison trouvé</font>")
                 return;
             }
-            let top = 270;
-            let left = 400;
-            let listStr = "<br><br><br><br><br><br><br><br><br><br><br><br><br><br>";
-            listStr += "<table>";
+            let top;
+            let left;
+            if (!isMobile) {
+                top = 300;
+                left = screen.width*0.2;
+            } else {
+                top = 330;
+                left = screen.width*0.45;
+            }
+            let listStr = "<br><br><br><br><br><br><br><br><br><br>";
             for (let i=0;i<saisonList.length;i++) {
                 let lien = "/series/saisons/episodes?id="+saisonList[i].id;
                 listStr += "<tr><td>";
@@ -93,15 +131,18 @@
                         listStr += "<input onclick='location.href = `/modif/saison?id=" + saisonList[i].id + "`' style='position: absolute; z-index: 3; top: " + (top + 225) + "px; left: " + (left + 75) + "px' type='button' value='modifier' />";
                     }
                 }
-                listStr += "</td></tr>";
-                left += 230;
-                if (left >= 400+(230*3)) {
-                    listStr += "<br><br><br><br><br><br><br><br><br><br><br><br>";
-                    left = 400;
+                if (!isMobile) {
+                    left += 350;
+                    if (left >= 300 + (350 * 3)) {
+                        listStr += "<br><br><br><br><br><br><br><br>";
+                        left = 300;
+                        top += 300;
+                    }
+                } else {
                     top += 300;
+                    listStr += "<br><br><br><br><br><br><br><br>";
                 }
             }
-            listStr += "</table>";
             $("#displaySaison").html(listStr);
         }
 
